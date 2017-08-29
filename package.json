@@ -1,0 +1,22 @@
+{
+  "name": "edigame-api",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm install",
+    "start": "node index.js",
+    "dev": "mongod -f models/mongodb/mongod.conf & node index.js"
+  },
+  "dependancies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/msharaf10/edigame-api.git"
+  },
+  "author": "sharaf",
+  "license": "ISC",
+  "homepage": "https://github.com/msharaf10/edigame-api#readme",
+  "dependencies": {
+    "express": "^4.15.4"
+  }
+}
