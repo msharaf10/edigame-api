@@ -19,7 +19,7 @@ let userSchema = new Schema({
 		isLeader: Boolean,
 		role: String
 	},
-	level: Number //    feet    //
+	level: Number, //    feet    //
 	decisions: [{}], // TODO define decisions
 },
 {

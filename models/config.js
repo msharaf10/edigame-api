@@ -1,3 +1,4 @@
 module.exports = {
-	port: 3001
+	port: 3000,
+	dbURL: 'localhost:5000'
 };
