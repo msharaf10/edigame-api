@@ -16,7 +16,9 @@
   "license": "ISC",
   "homepage": "https://github.com/msharaf10/edigame-api#readme",
   "dependencies": {
+    "body-parser": "^1.17.2",
     "express": "^4.15.4",
-    "mongoose": "^4.11.9"
+    "mongoose": "^4.11.9",
+    "morgan": "^1.8.2"
   }
 }
