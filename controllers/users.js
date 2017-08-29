@@ -17,3 +17,20 @@ exports.createUser = ( req, res, next ) => {
 	return res.sendStatus(200);
 	});
 }
+
+exports.updateUserById = ( req, res, next ) => {
+	User.fineByIdAndUpdate( req.params.id, req.body, ( err, user ) => {
+		if ( err ) return next( err );
+		if ( !user ) return res.status( 404 ).send( 'No user with that ID' );
+		return res.sendStatus( 200 );
+	});
+}
+
+exports.deleteUserById = ( req, res, next ) => {
+	User.findByIdAndRemove( req.params.id, ( err, user ) => {
+		if ( err ) return next( err );
+		if ( !user ) return res.status( 404 ).send( 'No user with that ID' );
+		return res.sendStatus( 200 );
+	});
+}
+
