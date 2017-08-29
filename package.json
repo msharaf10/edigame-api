@@ -8,7 +8,6 @@
     "start": "node index.js",
     "dev": "mongod -f models/mongodb/mongod.conf & node index.js"
   },
-  "dependancies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/msharaf10/edigame-api.git"
@@ -17,6 +16,7 @@
   "license": "ISC",
   "homepage": "https://github.com/msharaf10/edigame-api#readme",
   "dependencies": {
-    "express": "^4.15.4"
+    "express": "^4.15.4",
+    "mongoose": "^4.11.9"
   }
 }
