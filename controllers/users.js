@@ -1,4 +1,5 @@
 const User = require( '../models/schemas/user' );
+const config = require( '../models/config' );
 
 exports.getUsers = ( req, res, next ) => {
 	User.find( {}, ( err, users ) => {
@@ -8,13 +9,38 @@ exports.getUsers = ( req, res, next ) => {
 }
 
 exports.createUser = ( req, res, next ) => {
-	var newUser = new User( req.body );
+	if ( typeof req.body.email !== 'string' )
+		return res.status( 400 ).send( 'No email');
+	if ( typeof req.body.password !== 'string' )
+		return res.status( 400 ).send( 'No password' );
+
+	let userData = {};
+
+	if ( req.body.firstName && typeof req.body.firstName === 'string' )
+		userData.firstName = req.body.firstName;
+	if ( req.body.lastName && typeof req.body.lastName === 'string' )
+		userData.lastName = req.body.lastName;
+	if ( req.body.companyName && typeof req.body.companyName === 'string' )
+		userData.companyName = req.body.companyName;
+	if ( req.body.phone && typeof req.body.phone === 'string' )
+		userData.phone = req.body.phone;
+	if ( req.body.password && typeof req.body.password === 'string' )
+		userData.hash = req.body.password;
+	if ( req.body.isAdmin )
+		userData.isAdmin = true;
+	if ( req.body.email && typeof req.body.email === 'string' ) {
+		if ( !( config.regex ).test( req.body.email ) )
+			return res.status( 400 ).send( 'Invalid email' );
+		userData.email = req.body.email;
+	}
+
+	let newUser = new User( userData );
 	newUser.save( ( err ) => {
 		if ( err ) {
-			if ( err.code === 11000 ) return res.status( 400 ).send( 'you are already registered' );
+			if ( err.code === 11000 ) return res.status( 400 ).send( 'Email or phone already registered' );
 			return next( err );
 		}
-	return res.sendStatus(200);
+		return res.sendStatus( 200 );
 	});
 }
 
