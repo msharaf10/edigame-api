@@ -8,13 +8,13 @@ const routes = require( './routes/routes' );
 
 const app = express();
 
-app.use( bodyParser.json() );
-app.use( bodyParser.urlencoded( { extended: false } ) );
-
 mongoose.Promise = global.Promise;
 mongoose.connect( config.dbURL, { server: { socketOptions: { keepAlive: 120 } } } );
 
 if ( app.get( 'env' ) !== 'production' ) app.use( logger( 'dev' ) );
+
+app.use( bodyParser.json() );
+app.use( bodyParser.urlencoded( { extended: false } ) );
 
 app.use( '/', routes );
 
@@ -32,12 +32,12 @@ app.use( ( err, req, res, next ) => {
 
 	let status = err.status || 500;
 	let message;
-	
+
 	if ( status >= 400 && status < 500 && err.message ) {
 		message = err.message;
 	} else {
 		message = '';
-	
+
 	}
 	res.status( status ).send( message );
 });
