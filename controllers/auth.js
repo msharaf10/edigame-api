@@ -13,16 +13,17 @@ exports.loginUser = ( req, res, next ) => {
         if ( err ) return next( err );
         if ( !user ) return res.status( 404 ).send( 'No user with that email' );
 
-        user.comparePassword( req.body.password, ( err, isMatch) => {
+        user.comparePassword( req.body.password, ( err, isMatch ) => {
             if ( err ) return next( err );
             if ( !isMatch ) return res.status( 401 ).send( 'Incorrect password' );
 
             let payload = {
                 id: user._id,
-                name: user.firstName || user.lastName || user.email,
-                fullName: user.lastName ? user.firstName + ' ' + user.lastName : user.firstName,
+                name: user.firstName || user.username,
+                username: user.username,
                 email: user.email,
-                isAdmin: !!user.isAdmin
+                isAdmin: !!user.isAdmin,
+                isLeader: !!user.isLeader
             };
 
             let token = jwt.encode( payload, config.secretKey );
@@ -35,4 +36,36 @@ exports.loginUser = ( req, res, next ) => {
             });
         });
     });
+}
+
+exports.adminRequired = ( req, res, next ) => {
+    var token = req.headers[ 'x-access-token' ];
+
+    try {
+        var decoded = jwt.decode( token, config.secretKey, true );
+    } catch (err) {
+        return res.status( 403 ).send( 'Failed to authenticate token' );
+    }
+    if ( decoded.isAdmin ) {
+        //next();
+        res.send( decoded.isAdmin );
+    } else {
+        res.status( 403 ).send( 'Not allowed, Admin Required' );
+    }
+}
+
+exports.leaderRequired = ( req, res, next ) => {
+    var token = req.headers[ 'x-access-token' ];
+
+    try {
+        var decoded = jwt.decode( token, config.secretKey, true );
+    } catch ( err ) {
+        return res.status( 403 ).send( 'Failed to authenticate token' );
+    }
+    if ( decoded.isLeader ) {
+        //next();
+        res.send( decoded.isLeader );
+    } else {
+        res.status( 403 ).send( 'Not allowed, Leader Required' );
+    }
 }
