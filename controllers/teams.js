@@ -64,25 +64,23 @@ exports.getReadyUsers = ( req, res, next ) => {
 }
 
 exports.toggleReadyUser = ( req, res, next ) => {
-    Team.update( req.body.teamId || req.params.id, ( err, team ) => {
+	Team.findById( req.params.id || req.body.userTeam, ( err, team ) => {
         if ( err ) return next( err );
-        if ( !team ) return res.status( 404 ).send( 'This team is not exist' );
+        if ( !team ) return res.status( 404 ).send( 'No team with that ID' );
 
-        let players = team.players;
-        console.log( 'one players: ' + players[0].isReady );
-
-        function findUserId( userId ) {
-            return userId.playerId === req.body.playerId;
+        for ( var i in team.players ) {
+            if ( team.players[ i ].playerId.toString() === req.body.playerId.toString() ) {
+                console.log( 'about to toggle' )
+                team.players[ i ].isReady = !team.players[ i ].isReady;
+                console.log( 'player\'s isReady is toggled' );
+                var status = team.players[ i ].isReady;
+                break;
+            }
         }
-
-        let player = players.find( findUserId );
-        console.log( 'player: ' + player );
-        // TODO check if user is ready
-
-        player.isReady = !player.isReady;
-        team.markModified('players');
+        team.markModified( 'players' );
         team.save( ( err ) => {
             if ( err ) return next( err );
+            console.log( 'player: ' + req.body.playerId + ' updated to: ' + status );
             return res.sendStatus( 200 );
         });
     });
