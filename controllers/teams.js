@@ -31,6 +31,14 @@ exports.getTeamById = ( req, res, next ) => {
 
 // TODO get team by name
 
+exports.getTeamByName = ( req, res, next ) => {
+    Team.find( { 'teamName': req.params.name || req.body.teamName }, {},( err, team ) => {
+        if ( err ) return next( err );
+        if ( !team ) return res.status( 404 ).send( 'No team with that name' );
+        return res.status( 200 ).send( team );
+    });
+}
+
 // TODO search for team Algorithm
 
 exports.updateTeamById = ( req, res, next ) => {
@@ -63,7 +71,19 @@ exports.getReadyUsers = ( req, res, next ) => {
     });
 }
 
+// TODO define route for users of team
+exports.getUsersOfTeam = ( req, res, next ) => {
+    Team.findById( req.body.teamId, ( err, team ) => {
+        if ( err ) return next( err );
+        if ( !team ) return res.status( 404 ).send( 'No team with that ID' );
+        return res.status( 200 ).send( team.players );
+    });
+}
+
 exports.toggleReadyUser = ( req, res, next ) => {
+    if ( !req.body.playerId )
+        return res.status( 400 ).send( 'Missing player ID' );
+
 	Team.findById( req.params.id || req.body.userTeam, ( err, team ) => {
         if ( err ) return next( err );
         if ( !team ) return res.status( 404 ).send( 'No team with that ID' );
