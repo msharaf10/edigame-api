@@ -22,6 +22,9 @@ exports.loginUser = ( req, res, next ) => {
                 name: user.firstName || user.username,
                 username: user.username,
                 email: user.email,
+                team: user.team,
+                started: user.started,
+                profPic: user.profPic,
                 isAdmin: !!user.isAdmin,
                 isLeader: !!user.isLeader
             };
@@ -43,12 +46,12 @@ exports.adminRequired = ( req, res, next ) => {
 
     try {
         var decoded = jwt.decode( token, config.secretKey, true );
-    } catch (err) {
+    } catch ( err ) {
         return res.status( 403 ).send( 'Failed to authenticate token' );
     }
     if ( decoded.isAdmin ) {
-        //next();
-        res.send( decoded.isAdmin );
+        next();
+        //res.send( decoded.isAdmin );
     } else {
         res.status( 403 ).send( 'Not allowed, Admin Required' );
     }
@@ -68,4 +71,16 @@ exports.leaderRequired = ( req, res, next ) => {
     } else {
         res.status( 403 ).send( 'Not allowed, Leader Required' );
     }
+}
+
+exports.tokenRequired = ( req, res, next ) => {
+    let token = req.headers[ 'x-access-token' ];
+    if ( !token ) return res.status( 403 ).send( 'Token required' );
+
+    try {
+        var decoded = jwt.decode( token, config.secretKey, true );
+    } catch ( err ) {
+        return res.status( 403 ).send( 'Failed to authenticate token' );
+    }
+    next();
 }
