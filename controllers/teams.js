@@ -9,15 +9,33 @@ exports.getTeams = ( req, res, next ) => {
 }
 
 exports.createTeam = ( req, res, next ) => {
-    // TODO admin required
-    // TODO validating team
-    let newTeam = new Team( req.body );
-    newTeam.save( ( err ) => {
+    if ( typeof req.body.teamName !== 'string' )
+        return res.status( 400 ).send( 'no team' );
+    if ( typeof req.body.companyName !== 'string' )
+        return res.status( 400 ).send( 'no companyName' );
+    if ( typeof req.body.adminId !== 'string' )
+        return res.status( 400 ).send( 'no admin' );
+
+    let teamData = {};
+
+    if ( req.body.teamName && typeof req.body.teamName === 'string' )
+        teamData.teamName = req.body.teamName;
+    if ( req.body.companyName && typeof req.body.companyName === 'string' )
+        teamData.companyName = req.body.companyName;
+    if ( req.body.adminId && typeof req.body.adminId === 'string' )
+        teamData.admin = req.body.adminId
+
+    let newTeam = new Team( teamData );
+    newTeam.save( ( err, team ) => {
         if ( err ) {
             if ( err.code === 11000 ) return res.status( 400 ).send( 'This team is already token' );
             return next( err );
         }
-        return res.sendStatus( 200 );
+        User.findByIdAndUpdate( req.body.adminId, { team: team._id }, ( err, user ) => {
+            if ( err ) return next( err );
+            return res.sendStatus( 200 );
+        });
+        //return res.sendStatus( 200 );
     });
 }
 
@@ -32,9 +50,9 @@ exports.getTeamById = ( req, res, next ) => {
 // TODO get team by name
 
 exports.getTeamByName = ( req, res, next ) => {
-    Team.find( { 'teamName': req.params.name || req.body.teamName }, {},( err, team ) => {
+    Team.find( { 'teamName': req.query.q || req.params.name || req.body.teamName }, {},( err, team ) => {
         if ( err ) return next( err );
-        if ( !team ) return res.status( 404 ).send( 'No team with that name' );
+        if ( !team.length ) return res.status( 404 ).send( 'No team with that name' );
         return res.status( 200 ).send( team );
     });
 }
@@ -104,4 +122,40 @@ exports.toggleReadyUser = ( req, res, next ) => {
             return res.sendStatus( 200 );
         });
     });
+}
+
+exports.addUserToTeam = ( req, res, next ) => {
+    if ( !req.body.playerId ) return res.status( 400 ).send( 'no player ID' );
+
+    Promise.all([
+        User.findById( req.body.playerId ).exec(),
+        Team.findById( req.body.teamId ).exec()
+
+    ]).then( ( results ) => {
+        let user = results[ 0 ];    // get user
+        let team = results[ 1 ];    // get team
+
+        if ( !team )
+            return res.status( 404 ).send( 'No team with that ID' );
+        if ( team.players.length === 5 )
+            return res.status( 401 ).send( 'Max number of players is 5' );
+
+        // check if player is already member of the team
+        for ( var i in team.players ) {
+            if ( team.players[ i ].playerId == req.body.playerId ) {
+                return res.status( 401 ).send( 'This player already member of your team' );
+            }
+        }
+
+        // add player to the team
+        team.players.push({
+            playerId: req.body.playerId
+        });
+
+        team.markModified( 'players');
+        team.save();
+
+    }).then( () => {
+        return res.sendStatus( 200 );
+    }).catch( ( err ) => next( err ) );
 }
