@@ -137,13 +137,18 @@ exports.addUserToTeam = ( req, res, next ) => {
 
         if ( !team )
             return res.status( 404 ).send( 'No team with that ID' );
-        if ( team.players.length === 5 )
-            return res.status( 401 ).send( 'Max number of players is 5' );
+        if ( team.players.length === 5 ) {
+            var err = new Error( 'Max number of players is 5' );
+            err.status = 400;
+            throw err;
+        }
 
         // check if player is already member of the team
         for ( var i in team.players ) {
             if ( team.players[ i ].playerId == req.body.playerId ) {
-                return res.status( 401 ).send( 'This player already member of your team' );
+                var err = new Error( 'This player already member of your team' );
+                err.status = 400;
+                throw err;
             }
         }
 
@@ -155,6 +160,41 @@ exports.addUserToTeam = ( req, res, next ) => {
         team.markModified( 'players');
         team.save();
 
+        // add team to player
+        user.team = req.body.teamId;
+        user.markModified( 'team' );
+        user.save();
+
+    }).then( () => {
+        return res.sendStatus( 200 );
+    }).catch( ( err ) => next( err ) );
+}
+
+exports.removeUserFromTeam = ( req, res, next ) => {
+    if ( !req.body.playerId ) return res.status( 400 ).send( 'no player ID' );
+
+    Promise.all([
+        User.findById( req.body.playerId ).exec(),
+        Team.findById( req.body.teamId ).exec()
+
+    ]).then( ( results ) => {
+        let user = results[ 0 ];
+        let team = results[ 1 ];
+
+        let userIndex = team.players.findIndex( player => player.playerId == req.body.playerId );
+        if ( userIndex === -1 ) {
+            var err = new Error( 'No players with that ID' );
+            err.status = 400;
+            throw err;
+        }
+
+        team.players.splice( userIndex, 1 );
+        team.markModified( 'players' );
+        team.save();
+
+        user.team = undefined;
+        user.markModified( 'team' );
+        user.save();
     }).then( () => {
         return res.sendStatus( 200 );
     }).catch( ( err ) => next( err ) );
