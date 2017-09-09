@@ -10,10 +10,16 @@ const router = express.Router();
 
 // TODO params ( id, userName,  ) middleware
 
+// =====================================
 // Routes
+// =====================================
+
+// ======================
+// users
+// ======================
 router.route( '/users' )
 	.get( users.getUsers )
-	.post( users.createUser );
+	.post( users.createUser, auth.loginUser );
 
 router.route( '/users/:id')
 	.get( users.getUserById )
@@ -23,6 +29,9 @@ router.route( '/users/:id')
 router.route( '/users/user/:userName' )
 	.get( users.getUserByUsername );
 
+// ======================
+// Teams
+// ======================
 router.route( '/teams' )
 	.get( teams.getTeams )
 	.post( auth.adminRequired, teams.createTeam );
@@ -38,21 +47,33 @@ router.route( '/teams/team/:name' )
 router.route( '/teams/:id/ready' )
 	.get( teams.getReadyUsers );
 
-router.route( '/teams/:id/ready/toggle' )
+router.route( '/teams/users/:name' )
+	.get( users. getTeam, users.getUsersOfTeam );
+
+router.route( '/teams/add/user' )
+	.post( auth.adminRequired, teams.addUserToTeam );
+
+router.route( '/teams/remove/user' )
+	.post( auth.adminRequired, teams.removeUserFromTeam );
+
+// ======================
+// Search
+// ======================
+router.get( '/search/user', users.getUserByUsername );
+router.get( '/search/team', teams.getTeamByName );
+
+// ======================
+// rooms
+// ======================
+router.route( '/room/teams/:id/ready/toggle' )
 	.put( auth.tokenRequired, teams.toggleReadyUser );
 
-router.route( '/teams/users/:id' )
-	.get( users.getTeamUsers );
-/*
-router.route( '/rooms' )
-	.get( rooms.getRooms )
-	.post( auth.leaderRequired, rooms.initRoom );
-
-router.route( '/room/:roomId/:team' )
-	.get( rooms.getUserRoom )
+/*router.route( '/room/ready/:id' )
+	.get( rooms. )
 	.put( auth.leaderRequired, rooms.updateTeam )
-	.delete( auth.leaderRequired, rooms.deleteRoomById );
-*/
+	.delete( auth.leaderRequired, rooms.deleteRoomById );*/
+
+
 router.post( '/auth/token' ,  auth.loginUser  );
 
 module.exports = router;
