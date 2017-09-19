@@ -2,15 +2,40 @@ const jwt = require( 'jwt-simple' );
 
 const User = require( '../models/schemas/user' );
 const config = require( '../models/config' );
+const helpers = require( '../models/helpers' );
 
 exports.loginUser = ( req, res, next ) => {
-    if ( typeof req.body.email !== 'string' )
-        return res.status( 400 ).send( 'Missing email' );
-    if ( typeof req.body.password !== 'string' )
-        return res.status( 400 ).send( 'Missing password' );
 
-    User.findOne( { email: req.body.email }, ( err, user ) => {
-        if ( err ) return next( err );
+    // check required params
+    let requiredParams = [
+        'email',
+        'password'
+    ],
+        errorParam = false;
+
+    requiredParams.forEach( ( param ) => {
+        if ( errorParam ) return;
+
+        if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) )
+            errorParam = 'Missing ' + param;
+
+        if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) )
+            errorParam = 'Missing ' + param;
+    });
+
+    if ( errorParam )
+        return res.status( 400 ).send( errorParam );
+
+    // validate email
+    if ( !( helpers.regex.validEmail).test( req.body.email ) )
+        return res.status( 400 ).send( 'Invalid email' );
+
+    // validate password
+    if ( req.body.password.length <= 7 )
+        return res.status( 400 ).send( 'Invalid password' );
+
+    User.findOne( { email: req.body.email } ).exec()
+    .then( ( user ) => {
         if ( !user ) return res.status( 404 ).send( 'No user with that email' );
 
         user.comparePassword( req.body.password, ( err, isMatch ) => {
@@ -19,26 +44,23 @@ exports.loginUser = ( req, res, next ) => {
 
             let payload = {
                 id: user._id,
-                name: user.firstName || user.username,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 username: user.username,
                 email: user.email,
-                team: user.team,
-                started: user.started,
                 profPic: user.profPic,
-                isAdmin: !!user.isAdmin,
-                isLeader: !!user.isLeader
+                isAdmin: !!user.isAdmin
             };
 
             let token = jwt.encode( payload, config.secretKey );
 
             user.token = token;
 
-            user.save( ( err ) => {
-                if ( err ) return next( err );
+            user.save().then( () => {
                 res.json( { token: token } );
-            });
+            }).catch( ( err ) => next( err ) )
         });
-    });
+    }).catch( ( err ) => next( err ) );
 }
 
 exports.adminRequired = ( req, res, next ) => {
@@ -51,36 +73,11 @@ exports.adminRequired = ( req, res, next ) => {
     }
     if ( decoded.isAdmin ) {
         next();
-        //res.send( decoded.isAdmin );
     } else {
         res.status( 403 ).send( 'Not allowed, Admin Required' );
     }
 }
 
 exports.leaderRequired = ( req, res, next ) => {
-    var token = req.headers[ 'x-access-token' ];
-
-    try {
-        var decoded = jwt.decode( token, config.secretKey, true );
-    } catch ( err ) {
-        return res.status( 403 ).send( 'Failed to authenticate token' );
-    }
-    if ( decoded.isLeader ) {
-        //next();
-        res.send( decoded.isLeader );
-    } else {
-        res.status( 403 ).send( 'Not allowed, Leader Required' );
-    }
-}
-
-exports.tokenRequired = ( req, res, next ) => {
-    let token = req.headers[ 'x-access-token' ];
-    if ( !token ) return res.status( 403 ).send( 'Token required' );
-
-    try {
-        var decoded = jwt.decode( token, config.secretKey, true );
-    } catch ( err ) {
-        return res.status( 403 ).send( 'Failed to authenticate token' );
-    }
-    next();
+    // TODO check if user is a leader of his team
 }

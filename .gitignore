@@ -1,4 +1,2 @@
 node_modules/
-models/mongodb/logs.mongod.log
 models/mongodb/data/db/
-models/mongodb/logs/
