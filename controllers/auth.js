@@ -27,7 +27,7 @@ exports.loginUser = ( req, res, next ) => {
         return res.status( 400 ).send( errorParam );
 
     // validate email
-    if ( !( helpers.regex.validEmail).test( req.body.email ) )
+    if ( !( helpers.regex.validEmail ).test( req.body.email ) )
         return res.status( 400 ).send( 'Invalid email' );
 
     // validate password

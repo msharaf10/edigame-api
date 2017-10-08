@@ -1,6 +1,6 @@
 const User = require( '../models/schemas/user' );
 const Team = require( '../models/schemas/team' );
-const helperss = require( '../models/helpers' );
+const helpers = require( '../models/helpers' );
 
 exports.getUsers = ( req, res, next ) => {
 	User.find( {} ).exec()

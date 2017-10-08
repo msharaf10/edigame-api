@@ -4,12 +4,13 @@ const Schema = mongoose.Schema;
 
 const teamSchema = new Schema({
     teamName: { type: String, require: true, unique: true, trim: true },
-    companyName: String,
-    room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
+    admin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    companyName: { type: String, require: true },
     progress: {},
     status: {},
     players: [{
         playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        role: String,
         isLeader: { type: Boolean, default: false },
         isReady: { type:Boolean, default: false },
         equipments: {
@@ -18,7 +19,6 @@ const teamSchema = new Schema({
             medicalGear: {},
             clothing: {}
         },
-        role: { type: String, unique: true, trim: true },
         health: { type: Number, default: 100 },
         level: { type: Number, default: 0 },
         decisions: [{

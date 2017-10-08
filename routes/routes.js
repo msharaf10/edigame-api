@@ -26,7 +26,7 @@ router.route( '/users/:id')
 	.put( users.updateUserById )
 	.delete( users.deleteUserById );
 
-router.route( '/users/user/:userName' )
+router.route( '/users/user/:username' )
 	.get( users.getUserByUsername );
 
 // ======================
@@ -47,8 +47,8 @@ router.route( '/teams/team/:name' )
 router.route( '/teams/:id/ready' )
 	.get( teams.getReadyUsers );
 
-router.route( '/teams/users/:name' )
-	.get( users. getTeam, users.getUsersOfTeam );
+router.route( '/teams/:name/users' )
+	.get( users.getTeam, users.getUsersOfTeam );
 
 router.route( '/teams/add/user' )
 	.post( auth.adminRequired, teams.addUserToTeam );
@@ -66,7 +66,7 @@ router.get( '/search/team', teams.getTeamByName );
 // rooms
 // ======================
 router.route( '/room/teams/:id/ready/toggle' )
-	.put( auth.tokenRequired, teams.toggleReadyUser );
+	.put( teams.toggleReadyUser );
 
 /*router.route( '/room/ready/:id' )
 	.get( rooms. )
