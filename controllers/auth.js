@@ -1,8 +1,29 @@
+/**************************************************************************\
+*
+*  ->  FILENAME :    auth.js
+*
+*  ->  RESPOSIBILITY :
+*        Authentication and authorization users.
+*
+*  ->  DESCRIPTION :
+*        Identifying users and access control to system objects
+*        based on their identity.
+*
+*  ->  Author :    Mohamed Sharaf
+*  ->  EMAIL :    mohamedsharafm10@gmail.com
+*
+*  ->  LAST MODIFIED BY : Mohamed Sharaf
+*  ->  LAST MODIFIED DATE : Thursday, 31-12-2000(GMT+2), 23:59:59
+*
+/**************************************************************************/
+
 const jwt = require( 'jwt-simple' );
+const mongoose = require( 'mongoose' );
 
 const User = require( '../models/schemas/user' );
-const config = require( '../models/config' );
-const helpers = require( '../models/helpers' );
+
+const config = require( '../config/env' ).env_development;
+const helpers = require( '../helpers/helpers' );
 
 exports.loginUser = ( req, res, next ) => {
 

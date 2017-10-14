@@ -3,15 +3,18 @@ const logger = require( 'morgan' );
 const bodyParser = require( 'body-parser' );
 const mongoose = require( 'mongoose' );
 
-const config = require( './models/config' );
+const db = require( './config/db' );
+const server_config = require( './config/server' );
+
 const routes = require( './routes/routes' );
 
 const app = express();
 
 mongoose.Promise = global.Promise;
-mongoose.connect( config.dbURL, { server: { socketOptions: { keepAlive: 120 } } } );
+mongoose.connect( db.dbURL, { server: { socketOptions: { keepAlive: 120 } } } );
 
 if ( app.get( 'env' ) !== 'production' ) app.use( logger( 'dev' ) );
+else require( './init/init' ); // run init script if in production mode
 
 app.use( bodyParser.json() );
 app.use( bodyParser.urlencoded( { extended: false } ) );
@@ -42,7 +45,7 @@ app.use( ( err, req, res, next ) => {
 	res.status( status ).send( message );
 });
 
-let server = app.listen( config.port ),
+let server = app.listen( server_config.port ),
 	port = server.address().port,
 	mode = app.get( 'env' );
 
