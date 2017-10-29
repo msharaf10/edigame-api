@@ -1,12 +1,26 @@
 const User = require( '../models/schemas/user' );
 const Team = require( '../models/schemas/team' );
-const helpers = require( '../models/helpers' );
+
+const constants = require( '../models/constants' );
+
+const { FIELDS } = constants;
+const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
+const { ADMIN_PROMOTION, ADMIN_DEMOTION } = constants.subjects;
+const { hasSpace, validEmail, isValidID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getUsers = ( req, res, next ) => {
-	User.find( {} ).exec()
-	.then( ( users ) => {
-		res.status( 200 ).json( users );
-	}).catch( ( err ) => next( err ) );
+
+	// filter => ignore super admins
+	let filter = {
+		$or: [
+			{ role : CLIENT },
+			{ role : ADMIN }
+		]
+	};
+
+	User.find( filter, FIELDS ).exec()
+		.then( users => res.status( 200 ).json( users ) )
+		.catch( err => next( err ) );
 }
 
 exports.createUser = ( req, res, next ) => {
@@ -16,155 +30,521 @@ exports.createUser = ( req, res, next ) => {
 		'firstName',
 		'lastName',
 		'username',
-		'phone',
 		'email',
 		'password'
 	],
-		errorParam = false;
+		missingParam = false;
 
-	requiredParams.forEach( ( param ) => {
-		if ( errorParam ) return;
+	requiredParams.forEach( param => {
+		if ( missingParam ) return;
 
-		if ( param === 'firstName' && ( typeof req.body.firstName !== 'string' || !req.body.firstName.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
+		if ( param === 'firstName' && ( typeof req.body.firstName !== 'string' || !req.body.firstName.length ) )
+			missingParam = `missing  requierd ${param}`;
 
-		if ( param === 'lastName' && ( typeof req.body.lastName !== 'string' || !req.body.lastName.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
+		if ( param === 'lastName' && ( typeof req.body.lastName !== 'string' || !req.body.lastName.length ) )
+			missingParam = `missing  requierd ${param}`;
 
-		if ( param === 'phone' && ( typeof req.body.phone !== 'string' || !req.body.phone.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
+		if ( param === 'username' && ( typeof req.body.username !== 'string' || !req.body.username.length ) )
+			missingParam = `missing  requierd ${param}`;
 
-		if ( param === 'username' && ( typeof req.body.username !== 'string' || !req.body.username.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
+		if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) )
+			missingParam = `missing  requierd ${param}`;
 
-		if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
-
-		if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) ) {
-			errorParam = 'Missing requierd ' + param;
-		}
+		if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) )
+			missingParam = `missing  requierd ${param}`;
 	});
 
-	if ( errorParam ) return res.status( 400 ).send( errorParam );
+	if ( missingParam )
+		return res.status( 400 ).json( { error: missingParam } );
 
 	// validate username
-	if ( req.body.username.length <= 7 )
-		return res.status( 400 ).send( 'username must be more than 7 chars' );
+	if ( hasSpace( req.body.username ) )
+		return res.status( 400 ).json( { error: 'invalid username' } );
+
+	if ( req.body.username.length <= 5 || req.body.username.length > 10 )
+		return res.status( 400 ).json( { error: 'invalid username length' } );
 
 	// validate password
-	if ( req.body.password.length <= 7 )
-		return res.status( 400 ).send( 'password must be more than 7 chars' );
+	if ( req.body.password.length <= 7 || req.body.password.length >= 31 )
+		return res.status( 400 ).json( { error: 'invalid password length' } );
 
 	// validate email
-	if ( !( helpers.regex.validEmail ).test( req.body.email ) )
-		return res.status( 400 ).send( 'Invalid email' );
-
-	// validate phone
-	if ( !( helpers.validPhone( req.body.phone ) ) )
-		return res.status( 400 ).send( 'Invalid phone' );
+	if ( !validEmail( req.body.email ) )
+		return res.status( 400 ).json( { error: 'invalid email' } );
 
 	let newUser = new User();
 
 	newUser.firstName = req.body.firstName;
 	newUser.lastName = req.body.lastName;
 	newUser.username = req.body.username;
-	newUser.phone = req.body.phone;
 	newUser.email = req.body.email;
 	newUser.hash = req.body.password;
-	newUser.profPic = { // ignore this for now :D
-		x: req.body['profPic[x]'],
-		y: req.body['profPic[y]']
+
+	let errorHandler = err => {
+
+		if ( err.code === 11000 ) {
+			let error = catchDuplicationKey( err );
+			return res.status( 400 ).json( error );
+		}
+		return next( err );
+	}
+
+	// save new user into the database
+	newUser.save()
+		.then( () => next() )
+		.catch( errorHandler );
+}
+
+exports.getUserByIdOrUsername = ( req, res, next ) => {
+
+	// filter => ignore super admins
+	let filter = {
+		$or: [
+			{ 'username': req.params.q || req.query.q }
+		],
+		$and: [{
+			$or: [
+				{ 'role': ADMIN },
+				{ 'role': CLIENT }
+			]
+		}]
 	};
 
-	newUser.save().then( () => {
-		next();
-	}).catch( ( err ) => {
-		if ( err.code === 11000 ) {
+	// push _id property to filter[ '$or' ] array if (q) param is valid id
+	if ( isValidID( req.params.q ) )
+		filter[ '$or' ].push( { '_id': req.params.q } );
 
-			var field = err.message.split( 'index: ' )[ 1 ];
-			field = field.split( ' dup key' )[ 0 ];
-			field = field.substring( 0, field.lastIndexOf( '_' ) );
+	let getUser = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+		return res.status( 200 ).json( user );
+	};
 
-			if ( field === 'email' ) {
-				return res.status( 400 ).send( 'Email already registered' );
-			}
-			if ( field === 'phone' ) {
-				return res.status( 400 ).send( 'phone already registered' );
-			}
-			if ( field === 'username' ) {
-				return res.status( 400 ).send( 'username already registered' );
-			}
-		}
-		next( err );
-	});
-}
-
-exports.getUserById = ( req, res, next ) => {
-	User.findById( req.params.id ).exec()
-	.then( ( user ) => {
-		if ( !user ) return res.status( 404 ).send( 'No user with that ID' );
-		res.status( 200 ).send( user );
-	}).catch( ( err ) => next( err ) );
-}
-
-exports.getUserByUsername = ( req, res, next ) => {
-	User.findOne( { 'username': req.query.q || req.params.username || req.body.username }, {} ).exec()
-	.then( ( user ) => {
-		if ( !user ) return res.status( 404 ).send( 'No user with that username' );
-		res.status( 200 ).send( user );
-	}).catch( ( err ) => next( err ) );
-}
-
-// TODO search for user Algorithm
-
-exports.getTeam = ( req, res, next ) => {
-	Team.findOne( { 'teamName': req.query.name || req.params.name }, {} ).exec()
-	.then( ( team ) => {
-		if ( !team ) return res.status( 404 ).send( 'No team with that name' );
-		if ( !team.players.length ) return res.status( 200 ).send( [], team.companyName );
-
-		req.company = team.companyName;
-		req.team = team._id;
-		next();
-
-	}).catch( ( err ) => next( err ) );
-}
-
-exports.getUsersOfTeam = ( req, res, next ) => {
-	User.find( { 'team': req.team }, {} ).exec()
-	.then( ( users ) => {
-		// remove admin from array
-		var adminIndex = users.findIndex( ( user ) => user[ 'isAdmin' ] == true );
-		var admin = users.splice( adminIndex, 1 );
-
-		res.status( 200 ).send( [ users, req.company, req.team ] );
-	}).catch( ( err ) => next( err ) );
+	User.findOne( filter, FIELDS ).exec()
+		.then( getUser )
+		.catch( err => next( err ) );
 }
 
 exports.updateUserById = ( req, res, next ) => {
-	// TODO validation
-	// TODO make user updates only basic information to
-	// avoid changing sensitive information e.g. isAdmin or started.
-	User.findByIdAndUpdate( req.params.id, req.body ).exec()
-	.then( ( user ) => {
-		if ( !user ) return res.status( 404 ).send( 'No user with that ID' );
-		res.sendStatus( 200 );
-	}).catch( ( err) => {
-		if ( err.code === 11000 )
-			return res.status( 400 ).send( 'phone, email or username already token' );
-		next( err );
-	});
+
+	if ( req.params.id !== req.user.id )
+		return res.sendStatus( 401 );
+
+	let updateUser = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		// TODO validate params
+		user.firstName = req.body.firstName || user.firstName;
+		user.lastName = req.body.lastName || user.lastName;
+		user.username = req.body.username || user.username;
+		user.imgURL = req.body.imgURL || user.imgURL;
+		user.hash = req.body.password || user.hash;
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( errorHandler );
+	}
+
+	let errorHandler = err => {
+
+		if ( err.code === 11000 ) {
+			let error = catchDuplicationKey( err );
+			return res.status( 400 ).json( error );
+		}
+		return next( err );
+	}
+
+	// update user
+	User.findById( req.params.id ).exec()
+		.then( updateUser )
+		.catch( err => next( err ) );
 }
 
 exports.deleteUserById = ( req, res, next ) => {
+
+	let deleteUser = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		if ( user._id !== req.user.id )
+			return res.status( 403 ).json( { error: 'invalid user' } );
+
+		return res.sendStatus( 200 );
+	}
+
 	User.findByIdAndRemove( req.params.id || req.body.id ).exec()
-	.then( ( user ) => {
-		if ( !user ) return res.status( 404 ).send( 'No user with that ID' );
-		res.sendStatus( 200 );
-	}).catch( ( err ) => next( err ) );
+		.then( deleteUser )
+		.catch( err => next( err ) );
+}
+
+exports.adminPromotion = ( req, res, next ) => {
+
+	// TODO check if user is a member of a team
+
+	// validate user id
+	if ( !req.body.userId || !req.body.userId.length )
+		return res.status( 400 ).json( { error: 'missing user id' } );
+
+	let promoteUser = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		if ( user.role === ADMIN )
+			return res.status( 208 ).json( { error: 'already an admin' } );
+
+		// change the role to 'Admin'
+		user.role = ADMIN;
+
+		// send promotion notification
+		user.notifications.push({
+
+			sender: req.user.id,
+			subject: ADMIN_PROMOTION,
+			date: new Date().toString()
+
+		});
+
+		// save changes into database
+		user.save()
+			.then( () => res.sendStatus( 201 ) )
+			.catch( err => next( err ) );
+	}
+
+	// promote user
+	User.findById( req.body.userId ).exec()
+		.then( promoteUser )
+		.catch( err => next( err ) );
+}
+
+exports.adminDemotion = ( req, res, next ) => {
+
+	// validate user id
+	if ( !req.body.userId || !req.body.userId.length )
+		return res.status( 400 ).json( { error: 'missing user id' } );
+
+	let demoteUser = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		if ( user.role !== ADMIN )
+			return res.status( 208 ).json( { error: 'not an admin' } );
+
+		// change the role to 'Admin'
+		user.role = CLIENT;
+
+		// send demotion otification
+		user.notifications.push({
+
+			sender: req.user.id,
+			subject: ADMIN_DEMOTION,
+			date: new Date().toString()
+
+		});
+
+		// save changes into database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err ) );
+	}
+
+	// demote user
+	User.findById( req.body.userId ).exec()
+		.then( demoteUser )
+		.catch( err => next( err ) );
+}
+
+// --------------------------------------------------
+// Requests
+// --------------------------------------------------
+exports.getTeamRequests = ( req, res, next ) => {
+
+	let getRequests = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		// Requests holder
+		let Requests = [];
+
+		// get all team requests
+		user.teamRequests.forEach( request => {
+
+			let pushRequest = results => {
+
+				let sender = results[ 0 ];
+				let team = results[ 1 ];
+
+				if ( !sender || !team )
+					return res.status( 404 ).json( { error: 'sender/team not found' } );
+
+				// collect all request information
+				let requestKeys = {
+					from: `${sender.firstName} ${sender.lastName}`,
+					senderId: sender._id,
+					senderImg: sender.imgURL,
+					team: team.name,
+					date: request.date
+				};
+
+				// push request information to Requests array
+				Requests.push( requestKeys );
+			};
+
+			let GET_DATA = [
+				User.findById( request.from ).exec(),	// get request sender
+				Team.findById( request.teamId ).exec()	// get team
+			];
+
+			// preparing to find request sender & team
+			Promise
+			.all( GET_DATA )
+			.then( pushRequest )
+			.catch( err => next( err ) );
+		});
+
+		delay( 100 ).then( () =>
+			res.status( 200 ).json( Requests )
+		);
+	}
+
+	// get user requests
+	User.findById( req.user.id ).exec()
+		.then( getRequests )
+		.catch( err => next( err ) );
+}
+
+exports.sendTeamRequest = ( req, res, next ) => {
+
+	// verification params
+	if ( !req.body.userId || !req.body.userId.length )
+		return res.status( 400 ).json( { error: 'missing user id' } );
+
+	if ( !req.body.teamId || !req.body.teamId.length )
+		return res.status( 400 ).json( { error: 'missing team id' } );
+
+	let sendRequest = results => {
+
+		let user = results[ 0 ];
+		let team = results[ 1 ];
+
+		if ( !user || !team )
+			return res.status( 404 ).json( { error: 'user/team not found' } );
+
+		// reject admins and super admins from joining teams
+		if ( user.role === ADMIN || user.role === SUPERADMIN )
+			return res.status( 403 ).json( { error: 'not client' } );
+
+		// check if user is already member of the team
+		let userIndex = team.members.findIndex(
+			member => member.id.toString() === req.body.userId
+		);
+
+		if ( userIndex !== -1 )
+			return res.status( 403 ).json( { error: 'already member' } );
+
+		// return if the requested team has 5 members
+		if ( team.members.length === 5 )
+			return res.status( 403 ).json( { error: 'max number of members is 5' } );
+
+		// TODO check how many requests admin has sent for
+		// one team, then return if requests === 5
+
+		// check if the requested user has been invited
+		let requestIndex = user.teamRequests.findIndex(
+			request => request.teamId.toString() === req.body.teamId
+		);
+
+		if ( requestIndex !== -1 )
+			return res.status( 403 ).json( { error: 'already requested' } );
+
+		// send invitation request
+		user.teamRequests.push({
+			from: req.user.id,
+			teamId: req.body.teamId,
+			date: new Date().toString()
+		});
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 201 ) )
+			.catch( err => next( err ) );
+	};
+
+	let GET_DATA = [
+		User.findById( req.body.userId ),	// get user
+		Team.findById( req.body.teamId )	// get team
+	];
+
+	// send team request
+	Promise
+	.all( GET_DATA )
+	.then( sendRequest )
+	.catch( err => next( err ) );
+}
+
+exports.declineTeamRequest = ( req, res, next ) => {
+
+	// verification params
+	if ( !req.body.userId || !req.body.userId.length )
+		return res.status( 400 ).json( { error: 'missing user id' } );
+
+	if ( !req.body.teamId || !req.body.teamId.length )
+		return res.status( 400 ).json( { error: 'missing team id' } );
+
+	let declineRequest = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		// authorize requester
+		// only the admin and the requested user can cancel the request
+		if ( req.user.id !== user._id.toString() && req.body.userId !== user._id.toString() )
+			return res.sendStatus( 403 );
+
+		// get request index
+		let requestIndex = user.teamRequests.findIndex(
+			request => request.teamId.toString() === req.body.teamId
+		);
+
+		// return if request not found or deleted
+		if ( requestIndex === -1 )
+			return res.status( 404 ).json( { error: 'request not found' } );
+
+		// remove the request from user's requests
+		user.teamRequests.splice( requestIndex, 1 );
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err) );
+	}
+
+	// decline or cancel request
+	User.findById( req.body.userId ).exec()
+		.then( declineRequest )
+		.catch( err => next( err ) );
+}
+
+// --------------------------------------------------
+// Notification
+// --------------------------------------------------
+exports.getAllNotifications = ( req, res, next ) => {
+
+	// TODO get all notification informations
+
+	/*
+	props = {
+		subject,
+		senderName,
+		senderId,
+		date,
+		seen,
+		read
+	}
+	*/
+
+	User.findById( req.user.id ).exec()
+		.then( user => res.status( 200 ).json( user.notifications ) )
+		.catch( err => next( err ) );
+}
+
+exports.markAllNotificationsAsSeenOrRead = ( req, res, next ) => {
+
+	let updateAllNotifications = user => {
+
+		user.notifications.forEach( notification => {
+			// change notifications props
+			if ( req.body.markSeen && req.body.markSeen === true )
+				notification.seen = true;
+
+			if ( req.body.markRead && req.body.markRead === true )
+				notification.read = true;
+		});
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err ) );
+	}
+
+	// update notifications
+	User.findById( req.user.id ).exec()
+		.then( updateAllNotifications )
+		.catch( err => next( err ) );
+}
+
+exports.markOneNotificationAsSeenOrRead = ( req, res, next ) => {
+
+	let updateOneNotification = user => {
+
+		// get notification index
+		let notificationIndex = user.notifications.findIndex(
+			notification => notification._id.toString() === req.params.id
+		);
+
+		if ( notificationIndex === -1 )
+			return res.status( 404 ).json( { error: 'notification not found' } );
+
+		// change notification props
+		if ( req.body.markRead && req.body.markRead === true )
+			user.notifications[ notificationIndex ].read = true;
+
+		if ( req.body.markSeen  && req.body.markSeen === true )
+			user.notifications[ notificationIndex ].seen = true;
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err ) );
+	}
+
+	// update notification
+	User.findById( req.user.id ).exec()
+		.then( updateOneNotification )
+		.catch( err => next( err ) );
+}
+
+exports.deleteAllNotifications = ( req, res, next ) => {
+
+	let deleteNotifications = user => {
+
+		// override the user's notifications array
+		user.notifications = [];
+
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err ) );
+	}
+
+	// delete all notifications
+	User.findById( req.user.id ).exec()
+		.then( deleteNotifications )
+		.catch( err => next( err ) );
+}
+
+exports.deleteOneNotification = ( req, res, next ) => {
+
+	let deleteNotification = user => {
+
+		// get notification index
+		let notificationIndex = user.notifications.findIndex(
+			notification => notification._id.toString() === req.params.id
+		);
+
+		if ( notificationIndex === -1 )
+			return res.status( 404 ).json( { error: 'notification not found' } );
+
+		// remove notification from notifications array
+		user.notifications.splice( notificationIndex, 1 );
+
+		// save changes into the database
+		user.save()
+			.then( () => res.sendStatus( 200 ) )
+			.catch( err => next( err ) );
+	}
+
+	// delete one notification
+	User.findById( req.user.id ).exec()
+		.then( deleteNotification )
+		.catch( err => next( err ) );
 }
