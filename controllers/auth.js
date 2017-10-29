@@ -1,29 +1,29 @@
-/**************************************************************************\
+/*
 *
 *  ->  FILENAME :    auth.js
 *
-*  ->  RESPOSIBILITY :
-*        Authentication and authorization users.
+*  ->  RESPONSIBILITY :
+*           Authentication and authorization users.
 *
 *  ->  DESCRIPTION :
-*        Identifying users and access control to system objects
-*        based on their identity.
+*           Identifying users and access control to system objects
+*           based on their identity.
 *
-*  ->  Author :    Mohamed Sharaf
-*  ->  EMAIL :    mohamedsharafm10@gmail.com
+*  ->  LAST MODIFIED BY :
+*           Mohamed Sharaf
 *
-*  ->  LAST MODIFIED BY : Mohamed Sharaf
-*  ->  LAST MODIFIED DATE : Thursday, 31-12-2000(GMT+2), 23:59:59
-*
-/**************************************************************************/
+*/
 
-const jwt = require( 'jwt-simple' );
+const jwt = require( 'jsonwebtoken' );
 const mongoose = require( 'mongoose' );
 
 const User = require( '../models/schemas/user' );
 
-const config = require( '../config/env' ).env_development;
-const helpers = require( '../helpers/helpers' );
+const constants = require( '../models/constants' );
+const { regex } = require( '../helpers/helpers' );
+const { secretKey } = require( '../config/credentials' );
+
+const { ADMIN, SUPERADMIN, CLIENT } = constants.userRoles;
 
 exports.loginUser = ( req, res, next ) => {
 
@@ -32,73 +32,119 @@ exports.loginUser = ( req, res, next ) => {
         'email',
         'password'
     ],
-        errorParam = false;
+        missingParam = false;
 
     requiredParams.forEach( ( param ) => {
-        if ( errorParam ) return;
+        if ( missingParam ) return;
 
         if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) )
-            errorParam = 'Missing ' + param;
+            missingParam = `missing  ${param}`;
 
         if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) )
-            errorParam = 'Missing ' + param;
+            missingParam = `missing  ${param}`;
     });
 
-    if ( errorParam )
-        return res.status( 400 ).send( errorParam );
+    if ( missingParam )
+        return res.status( 400 ).json( { error: missingParam } );
 
     // validate email
-    if ( !( helpers.regex.validEmail ).test( req.body.email ) )
-        return res.status( 400 ).send( 'Invalid email' );
+    if ( !( regex.validEmail ).test( req.body.email ) )
+        return res.status( 400 ).json( { error: 'invalid email' } );
 
-    // validate password
-    if ( req.body.password.length <= 7 )
-        return res.status( 400 ).send( 'Invalid password' );
+    let sendToken = user => {
 
-    User.findOne( { email: req.body.email } ).exec()
-    .then( ( user ) => {
-        if ( !user ) return res.status( 404 ).send( 'No user with that email' );
+        if ( !user )
+            return res.status( 404 ).json( { error: 'no user with that email' } );
 
+        // compare passwords
         user.comparePassword( req.body.password, ( err, isMatch ) => {
             if ( err ) return next( err );
-            if ( !isMatch ) return res.status( 401 ).send( 'Incorrect password' );
 
-            let payload = {
-                id: user._id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                username: user.username,
-                email: user.email,
-                profPic: user.profPic,
-                isAdmin: !!user.isAdmin
-            };
+            if ( !isMatch )
+                return res.status( 401 ).json( { error: 'incorrect password' } );
 
-            let token = jwt.encode( payload, config.secretKey );
+            let payload = { id: user._id };
+
+            let token = jwt.sign( payload, secretKey );
 
             user.token = token;
 
-            user.save().then( () => {
-                res.json( { token: token } );
-            }).catch( ( err ) => next( err ) )
+            user.save()
+                .then( () => res.json( { token: token } ) )
+                .catch( err => next( err ) );
         });
-    }).catch( ( err ) => next( err ) );
+    }
+
+    // find user then send him a token
+    User.findOne( { email: req.body.email } ).exec()
+        .then( sendToken )
+        .catch( err => next( err ) );
+}
+
+exports.resetPassword = ( req, res, next ) => {
+    // TODO reset password
+}
+
+exports.forgotPassword = ( req, res, next ) => {
+    // TODO forgot password
+}
+
+exports.tokenRequired = ( req, res, next ) => {
+    validateToken( req, res, next );
 }
 
 exports.adminRequired = ( req, res, next ) => {
-    var token = req.headers[ 'x-access-token' ];
+    validateToken( req, res, next, true );
+}
 
-    try {
-        var decoded = jwt.decode( token, config.secretKey, true );
-    } catch ( err ) {
-        return res.status( 403 ).send( 'Failed to authenticate token' );
-    }
-    if ( decoded.isAdmin ) {
-        next();
-    } else {
-        res.status( 403 ).send( 'Not allowed, Admin Required' );
-    }
+exports.superAdminRequired = ( req, res, next ) => {
+    validateToken( req, res, next, false, true );
 }
 
 exports.leaderRequired = ( req, res, next ) => {
-    // TODO check if user is a leader of his team
+    // TODO leader required
+}
+
+const validateToken = ( req, res, next, admin, superAdmin ) => {
+    let token = req.headers[ 'x-access-token' ] || req.body.token;
+
+    if ( !token )
+        return res.status( 403 ).json( { error: 'token required' } );
+
+    let decoded;
+
+    // try verify user's token
+    try {
+        decoded = jwt.verify( token, secretKey );
+    } catch ( e ) {
+        return res.status( 403 ).json( { error: 'failed to authenticate token' } );
+    }
+
+    if ( !decoded.id || !mongoose.Types.ObjectId.isValid( decoded.id ) )
+        return res.status( 403 ).json( { error: 'invalid token' } );
+
+    let checkUserIdentity = user => {
+
+        if ( !user )
+            return res.status( 403 ).json( { error: 'invalid user ID' } );
+
+        if ( token !== user.token )
+            return res.status( 403 ).json( { error: 'expired token' } );
+
+        if ( admin && user.role !== ADMIN )
+            return res.status( 403 ).json( { error: 'admin require' } );
+
+        if ( superAdmin && user.role !== SUPERADMIN )
+            return res.status( 403 ).json( { error: 'super admin required' } );
+
+        req.user = {
+            id: decoded.id,
+            role: user.role
+        };
+        next();
+    }
+
+    User.findById( decoded.id ).exec()
+        .then( checkUserIdentity )
+        .catch( err => next( err ) );
 }
