@@ -23,7 +23,7 @@ const mongoose = require( 'mongoose' );
 
 const { server, db } = require( './config/main' );
 
-const { routes, validateIDs } = require( './routes/routes' );
+const routes = require( './routes/routes' );
 
 const app = express();
 
@@ -39,7 +39,6 @@ else require( './init/init' ); // run init script if in production mode
 app.use( bodyParser.json() );
 app.use( bodyParser.urlencoded( { extended: false } ) );
 
-app.use( validateIDs )
 app.use( '/', routes );
 
 // =====================================

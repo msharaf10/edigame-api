@@ -5,33 +5,21 @@ const teams = require( '../controllers/teams' );
 const search = require( '../controllers/search' );
 const auth = require( '../controllers/auth' );
 
-const router = express.Router();
-
 const { validID } = require( '../helpers/helpers' );
+const { validateIDs } = require( '../routes/middlewares' );
+
+const router = express.Router();
 
 // =====================================
 // Middleware
 // =====================================
+router.use( validateIDs );
+
 router.param( 'id', ( req, res, next ) => {
 	if ( !validID( req.params.id ) )
-		return res.status( 400 ).json( { error: 'invalid ID' } );
+		return res.status( 400 ).json( { error: 'invalid id' } );
 	next();
 });
-
-// validate mongoose objects ID
-exports.validateIDs = ( req, res, next ) => {
-
-	if ( req.body.userId && !validID( req.body.userId ) )
-		return res.status( 400 ).json( { error: 'invalid ID' } );
-
-	if ( req.body.teamId && !validID( req.body.teamId ) )
-		return res.status( 400 ).json( { error: 'invalid ID' } );
-
-	if ( req.body.adminId && !validID( req.body.adminId ) )
-		return res.status( 400 ).json( { error: 'invalid ID' } );
-
-	next();
-}
 
 // =====================================
 // Routes
@@ -62,11 +50,11 @@ router.route( '/requests/teams/destroy' )
 
 router.route( '/notifications' )
 	.get( auth.tokenRequired, users.getAllNotifications )
-	.put( auth.tokenRequired, users.markAllNotificationsAsSeenOrRead )
+	.put( auth.tokenRequired, users.updateAllNotifications )
 	.delete( auth.tokenRequired, users.deleteAllNotifications );
 
 router.route( '/notifications/:id' )
-	.put( auth.tokenRequired, users.markOneNotificationAsSeenOrRead )
+	.put( auth.tokenRequired, users.updateOneNotification )
 	.delete( auth.tokenRequired, users.deleteOneNotification );
 
 router.route( '/admins' )
@@ -119,4 +107,4 @@ router.post( '/auth/token' ,  auth.loginUser  );
 router.post( '/auth/reset-password', auth.resetPassword );
 router.post( '/auth/forgot-password', auth.forgotPassword );
 
-exports.routes = router;
+module.exports = router;
