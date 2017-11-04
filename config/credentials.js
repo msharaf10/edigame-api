@@ -3,7 +3,11 @@ module.exports = {
     secretKey: 'thisisdefinitelynotthesecretkey',
 
     // For first super admin
-	// username
+    // First name
+    firstName: 'root',
+    // Last name
+    lastName: 'root',
+	// Username
 	username: 'root',
     // Email
     superAdminEmail: 'root@example.com',

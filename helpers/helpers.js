@@ -1,4 +1,3 @@
-const mongoose = require( 'mongoose' );
 
 exports.validEmail = email => {
     let regex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -27,12 +26,13 @@ exports.isValidPhone = phone => {
 }
 
 exports.validID = id => {
-    return mongoose.Types.ObjectId.isValid( id );
+    let regex = /^[a-fA-F0-9]{24}$/;
+    return ( regex ).test( id );
 }
 
 exports.delay = ms => {
-    return new Promise( resolve => setTimeout( resolve, ms ) )
-};
+    return new Promise( resolve => setTimeout( resolve, ms ) );
+}
 
 exports.catchDuplicationKey = err => {
     let field = err.message.split( 'index: ' )[ 1 ];
@@ -41,10 +41,7 @@ exports.catchDuplicationKey = err => {
     let dupKey = field.substring( 0, field.lastIndexOf( '_' ) );
 
     // for users
-    if ( dupKey === 'email' )
-        return { error: `${ dupKey } already registered` };
-
-    if ( dupKey === 'username' )
+    if ( dupKey === 'email' || dupKey === 'username' )
         return { error: `${ dupKey } already registered` };
 
     // for teams

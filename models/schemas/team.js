@@ -60,7 +60,7 @@ const teamSchema = new Schema({
             default: false
         },
         isReady: {
-            type:Boolean,
+            type: Boolean,
             default: false
         },
         health: {
