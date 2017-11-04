@@ -15,18 +15,15 @@
 */
 
 const jwt = require( 'jsonwebtoken' );
-const mongoose = require( 'mongoose' );
 
 const User = require( '../models/schemas/user' );
 
 const constants = require( '../models/constants' );
-const { regex } = require( '../helpers/helpers' );
 const { secretKey } = require( '../config/credentials' );
-
-const { ADMIN, SUPERADMIN, CLIENT } = constants.userRoles;
+const { validEmail, validID } = require( '../helpers/helpers' );
+const { ADMIN, SUPERADMIN } = constants.userRoles;
 
 exports.loginUser = ( req, res, next ) => {
-
     // check required params
     let requiredParams = [
         'email',
@@ -34,25 +31,21 @@ exports.loginUser = ( req, res, next ) => {
     ],
         missingParam = false;
 
-    requiredParams.forEach( ( param ) => {
+    requiredParams.forEach( param => {
         if ( missingParam ) return;
 
-        if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) )
-            missingParam = `missing  ${param}`;
-
-        if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) )
-            missingParam = `missing  ${param}`;
+        if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
+            missingParam = `missing ${ param }`;
     });
 
     if ( missingParam )
         return res.status( 400 ).json( { error: missingParam } );
 
     // validate email
-    if ( !( regex.validEmail ).test( req.body.email ) )
+    if ( !validEmail( req.body.email ) )
         return res.status( 400 ).json( { error: 'invalid email' } );
 
     let sendToken = user => {
-
         if ( !user )
             return res.status( 404 ).json( { error: 'no user with that email' } );
 
@@ -75,7 +68,7 @@ exports.loginUser = ( req, res, next ) => {
         });
     }
 
-    // find user then send him a token
+    // send a token to user
     User.findOne( { email: req.body.email } ).exec()
         .then( sendToken )
         .catch( err => next( err ) );
@@ -120,11 +113,10 @@ const validateToken = ( req, res, next, admin, superAdmin ) => {
         return res.status( 403 ).json( { error: 'failed to authenticate token' } );
     }
 
-    if ( !decoded.id || !mongoose.Types.ObjectId.isValid( decoded.id ) )
+    if ( !decoded.id || !validID( decoded.id ) )
         return res.status( 403 ).json( { error: 'invalid token' } );
 
     let checkUserIdentity = user => {
-
         if ( !user )
             return res.status( 403 ).json( { error: 'invalid user ID' } );
 
@@ -132,7 +124,7 @@ const validateToken = ( req, res, next, admin, superAdmin ) => {
             return res.status( 403 ).json( { error: 'expired token' } );
 
         if ( admin && user.role !== ADMIN )
-            return res.status( 403 ).json( { error: 'admin require' } );
+            return res.status( 403 ).json( { error: 'admin required' } );
 
         if ( superAdmin && user.role !== SUPERADMIN )
             return res.status( 403 ).json( { error: 'super admin required' } );

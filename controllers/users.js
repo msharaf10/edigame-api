@@ -6,7 +6,7 @@ const constants = require( '../models/constants' );
 const { FIELDS } = constants;
 const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
 const { ADMIN_PROMOTION, ADMIN_DEMOTION } = constants.subjects;
-const { hasSpace, validEmail, isValidID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
+const { hasSpace, validEmail, validID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getUsers = ( req, res, next ) => {
 
@@ -25,7 +25,7 @@ exports.getUsers = ( req, res, next ) => {
 
 exports.createUser = ( req, res, next ) => {
 
-	// Check requierd params
+	// Required params
 	let requiredParams = [
 		'firstName',
 		'lastName',
@@ -35,23 +35,12 @@ exports.createUser = ( req, res, next ) => {
 	],
 		missingParam = false;
 
+	// Check required params
 	requiredParams.forEach( param => {
 		if ( missingParam ) return;
 
-		if ( param === 'firstName' && ( typeof req.body.firstName !== 'string' || !req.body.firstName.length ) )
-			missingParam = `missing  requierd ${param}`;
-
-		if ( param === 'lastName' && ( typeof req.body.lastName !== 'string' || !req.body.lastName.length ) )
-			missingParam = `missing  requierd ${param}`;
-
-		if ( param === 'username' && ( typeof req.body.username !== 'string' || !req.body.username.length ) )
-			missingParam = `missing  requierd ${param}`;
-
-		if ( param === 'email' && ( typeof req.body.email !== 'string' || !req.body.email.length ) )
-			missingParam = `missing  requierd ${param}`;
-
-		if ( param === 'password' && ( typeof req.body.password !== 'string' || !req.body.password.length ) )
-			missingParam = `missing  requierd ${param}`;
+        if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
+			missingParam = `missing ${ param }`;
 	});
 
 	if ( missingParam )
@@ -81,13 +70,13 @@ exports.createUser = ( req, res, next ) => {
 	newUser.hash = req.body.password;
 
 	let errorHandler = err => {
-
-		if ( err.code === 11000 ) {
-			let error = catchDuplicationKey( err );
-			return res.status( 400 ).json( error );
-		}
-		return next( err );
-	}
+		// check duplicate key
+        if ( err.code === 11000 ) {
+            let error = catchDuplicationKey( err );
+            return res.status( 400 ).json( error );
+        }
+        return next( err );
+    }
 
 	// save new user into the database
 	newUser.save()
@@ -111,7 +100,7 @@ exports.getUserByIdOrUsername = ( req, res, next ) => {
 	};
 
 	// push _id property to filter[ '$or' ] array if (q) param is valid id
-	if ( isValidID( req.params.q ) )
+	if ( validID( req.params.q ) )
 		filter[ '$or' ].push( { '_id': req.params.q } );
 
 	let getUser = user => {
@@ -148,13 +137,13 @@ exports.updateUserById = ( req, res, next ) => {
 	}
 
 	let errorHandler = err => {
-
-		if ( err.code === 11000 ) {
-			let error = catchDuplicationKey( err );
-			return res.status( 400 ).json( error );
-		}
-		return next( err );
-	}
+		// check duplicate key
+        if ( err.code === 11000 ) {
+            let error = catchDuplicationKey( err );
+            return res.status( 400 ).json( error );
+        }
+        return next( err );
+    }
 
 	// update user
 	User.findById( req.params.id ).exec()
@@ -163,6 +152,8 @@ exports.updateUserById = ( req, res, next ) => {
 }
 
 exports.deleteUserById = ( req, res, next ) => {
+
+	// TODO check if user is a member of a team
 
 	let deleteUser = user => {
 		if ( !user )
@@ -199,11 +190,9 @@ exports.adminPromotion = ( req, res, next ) => {
 
 		// send promotion notification
 		user.notifications.push({
-
 			sender: req.user.id,
 			subject: ADMIN_PROMOTION,
 			date: new Date().toString()
-
 		});
 
 		// save changes into database
@@ -236,11 +225,9 @@ exports.adminDemotion = ( req, res, next ) => {
 
 		// send demotion otification
 		user.notifications.push({
-
 			sender: req.user.id,
 			subject: ADMIN_DEMOTION,
 			date: new Date().toString()
-
 		});
 
 		// save changes into database
@@ -258,6 +245,8 @@ exports.adminDemotion = ( req, res, next ) => {
 // --------------------------------------------------
 // Requests
 // --------------------------------------------------
+// TODO get sent requests(teams)
+
 exports.getTeamRequests = ( req, res, next ) => {
 
 	let getRequests = user => {
@@ -280,7 +269,7 @@ exports.getTeamRequests = ( req, res, next ) => {
 
 				// collect all request information
 				let requestKeys = {
-					from: `${sender.firstName} ${sender.lastName}`,
+					from: `${ sender.firstName } ${ sender.lastName }`,
 					senderId: sender._id,
 					senderImg: sender.imgURL,
 					team: team.name,
@@ -297,8 +286,7 @@ exports.getTeamRequests = ( req, res, next ) => {
 			];
 
 			// preparing to find request sender & team
-			Promise
-			.all( GET_DATA )
+			Promise.all( GET_DATA )
 			.then( pushRequest )
 			.catch( err => next( err ) );
 		});
@@ -377,8 +365,7 @@ exports.sendTeamRequest = ( req, res, next ) => {
 	];
 
 	// send team request
-	Promise
-	.all( GET_DATA )
+	Promise.all( GET_DATA )
 	.then( sendRequest )
 	.catch( err => next( err ) );
 }
@@ -448,9 +435,9 @@ exports.getAllNotifications = ( req, res, next ) => {
 		.catch( err => next( err ) );
 }
 
-exports.markAllNotificationsAsSeenOrRead = ( req, res, next ) => {
+exports.updateAllNotifications = ( req, res, next ) => {
 
-	let updateAllNotifications = user => {
+	let updateNotifications = user => {
 
 		user.notifications.forEach( notification => {
 			// change notifications props
@@ -469,13 +456,13 @@ exports.markAllNotificationsAsSeenOrRead = ( req, res, next ) => {
 
 	// update notifications
 	User.findById( req.user.id ).exec()
-		.then( updateAllNotifications )
+		.then( updateNotifications )
 		.catch( err => next( err ) );
 }
 
-exports.markOneNotificationAsSeenOrRead = ( req, res, next ) => {
+exports.updateOneNotification = ( req, res, next ) => {
 
-	let updateOneNotification = user => {
+	let updateNotification = user => {
 
 		// get notification index
 		let notificationIndex = user.notifications.findIndex(
@@ -500,7 +487,7 @@ exports.markOneNotificationAsSeenOrRead = ( req, res, next ) => {
 
 	// update notification
 	User.findById( req.user.id ).exec()
-		.then( updateOneNotification )
+		.then( updateNotification )
 		.catch( err => next( err ) );
 }
 

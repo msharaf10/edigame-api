@@ -10,7 +10,9 @@ const { hasSpace, validEmail, validID, catchDuplicationKey } = require( '../help
 
 exports.getTeams = ( req, res, next ) => {
 
-    Team.find( {} ).exec()
+    let fields = '_id name company';
+
+    Team.find( {}, fields ).exec()
         .then( teams => res.status( 200 ).json( teams ) )
         .catch( err => next( err ) );
 }
@@ -18,18 +20,14 @@ exports.getTeams = ( req, res, next ) => {
 // TODO create new chat to the new team
 exports.createTeam = ( req, res, next ) => {
 
-    let requiredParams = [ 'name', 'company', 'author' ],
+    let requiredParams = [ 'name', 'company' ],
         missingParam = false;
 
     requiredParams.forEach( param => {
         if ( missingParam ) return;
 
-        if ( param === 'name' && ( typeof req.body.teamName !== 'string' || !req.body.teamName.length ) )
-            missingParam = `missing  requierd ${param}`;
-
-        if ( param === 'company' && ( typeof req.body.company !== 'string' || !req.body.company.length ) )
-            missingParam = `missing  requierd ${param}`;
-
+        if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
+        	missingParam = `missing ${ param }`;
     });
 
     if ( missingParam )
@@ -40,7 +38,7 @@ exports.createTeam = ( req, res, next ) => {
         return res.status( 400 ).json( { error: 'invalid team name' } );
 
     // prevent clients and super admins from creating teams
-    if ( req.user.role === SUPERADMIN || req.user.role === CLIENT )
+    if ( req.user.role !== ADMIN )
         return res.status( 403 ).json( { error: 'admins only can create teams' } );
 
     let newTeam = new Team();
@@ -50,13 +48,13 @@ exports.createTeam = ( req, res, next ) => {
     newTeam.author = req.user.id;
 
     let errorHandler = err => {
-
-		if ( err.code === 11000 ) {
-			let error = catchDuplicationKey( err );
-			return res.status( 400 ).json( error );
-		}
-		return next( err );
-	}
+        // check duplicate key
+        if ( err.code === 11000 ) {
+            let error = catchDuplicationKey( err );
+            return res.status( 400 ).json( error );
+        }
+        return next( err );
+    }
 
     // save new team into the database
     newTeam.save()
@@ -117,21 +115,20 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
             User.findById( team.author, authorFields ).exec()   // get author
         ];
 
-        Promise
-        .all( GET_USERS )
+        Promise.all( GET_USERS )
         .then( sendTeamInfo )
         .catch( err => next( err ) );
     }
 
     let filter = {
-		$or: [
-			{ 'name': req.params.q || req.query.q }
+        $or: [
+            { 'name': req.params.q || req.query.q }
         ]
-	};
+    };
 
     // push _id property to filter[ '$or' ] array if (q) param is valid id
 	if ( validID( req.params.q ) )
-		filter[ '$or' ].push( { '_id': req.params.q } );
+        filter[ '$or' ].push( { '_id': req.params.q } );
 
     // get team informations
     Team.findOne( filter ).exec()
@@ -178,10 +175,10 @@ exports.getTeamsOfUserOrAdmin = ( req, res, next ) => {
 exports.addMemberToTeam = ( req, res, next ) => {
 
     if ( !req.body.adminId || !req.body.adminId.length )
-        return res.status( 400 ).json( { message: 'missing admin id' } );
+        return res.status( 400 ).json( { error: 'missing admin id' } );
 
     if ( !req.body.teamId || !req.body.teamId.length )
-        return res.status( 400 ).json( { message: 'missing team id' } );
+        return res.status( 400 ).json( { error: 'missing team id' } );
 
     let addNewMember = results => {
 
@@ -190,7 +187,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
         let team = results[ 2 ];
 
         if ( !user || !admin || !team )
-            return res.status( 404 ).json({ error: 'admin/team not found' } );
+            return res.status( 404 ).json( { error: 'admin/team not found' } );
 
         // check if user is already member
         let memberIndex = team.members.findIndex(
@@ -227,15 +224,14 @@ exports.addMemberToTeam = ( req, res, next ) => {
             sender: user._id
         });
 
-        let SAVE_ALL = [
+        let SAVE_CHANGES = [
             user.save(),
             admin.save(),
             team.save()
         ];
 
         // save all changes asynchronous
-        Promise
-        .all( SAVE_ALL )
+        Promise.all( SAVE_CHANGES )
         .then( () => res.sendStatus( 201 ) )
         .catch( err => next( err ) );
     }
@@ -247,8 +243,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
     ];
 
     // add new member to team
-    Promise
-    .all( GET_DATA )
+    Promise.all( GET_DATA )
     .then( addNewMember )
     .catch( err => next( err ) );
 }
@@ -256,7 +251,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
 exports.removeMemberFromTeam = ( req, res, next ) => {
     // TODO remove any team info associated with the member
 
-    if ( !req.body.userId  || !req.body.userId.length )
+    if ( !req.body.userId || !req.body.userId.length )
         return res.status( 400 ).json( { error: 'missing user id' } );
 
     if ( !req.body.teamId || !req.body.teamId.length )
@@ -338,7 +333,7 @@ exports.toggleReadyState = ( req, res, next ) => {
             .catch( err => next( err ) );
     }
 
-	Team.findById( req.params.id ).exec()
+    Team.findById( req.params.id ).exec()
         .then( toggleReady )
         .catch( err => next( err ) );
 }
