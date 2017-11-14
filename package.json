@@ -1,26 +1,27 @@
 {
-  "name": "edigame-api",
-  "version": "0.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "build": "npm install",
-    "start": "node index.js",
-    "dev": "mongod -f models/mongodb/mongod.conf & node index.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/msharaf10/edigame-api.git"
-  },
-  "author": "sharaf",
-  "license": "ISC",
-  "homepage": "https://github.com/msharaf10/edigame-api#readme",
-  "dependencies": {
-    "bcrypt-nodejs": "0.0.3",
-    "body-parser": "^1.17.2",
-    "express": "^4.15.4",
-    "jwt-simple": "^0.5.1",
-    "mongoose": "^4.7.6",
-    "morgan": "^1.8.2"
-  }
+    "name": "edigame-api",
+    "version": "0.0.0",
+    "description": "",
+    "main": "index.js",
+    "private": true,
+    "scripts": {
+        "start": "mongod -f ../db/mongod.conf & node index.js",
+        "build": "NODE_ENV=production node index.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/msharaf10/edigame-api.git"
+    },
+    "author": "Mohamed Sharaf <mohamedsharafm10@gmail.com>",
+    "license": "ISC",
+    "homepage": "https://github.com/msharaf10/edigame-api",
+    "dependencies": {
+        "bcrypt": "^1.0.3",
+        "body-parser": "^1.18.2",
+        "express": "^4.16.2",
+        "jsonwebtoken": "^8.1.0",
+        "mongoose": "^4.12.4",
+        "morgan": "^1.9.0",
+        "path": "^0.12.7"
+    }
 }

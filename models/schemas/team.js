@@ -1,45 +1,100 @@
+/*
+*
+*  ->  FILENAME :    team.js
+*
+*  ->  RESPONSIBILITY :
+*           Modeling teams data.
+*
+*  ->  DESCRIPTION :
+*
+*  ->  LAST MODIFIED BY :
+*           Mohamed Sharaf
+*
+*/
+
 const mongoose = require( 'mongoose' );
+
+const { DOCTOR, ENGINEER } = require( '../constants' ).memberRoles;
+const ROLES = [ DOCTOR, ENGINEER ];
 
 const Schema = mongoose.Schema;
 
+// ==========================
+// TEAM SCHEMA
+// ==========================
 const teamSchema = new Schema({
-    teamName: { type: String, require: true, unique: true, trim: true },
-    companyName: String,
-    room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
+    name: {
+        type: String,
+        trim: true,
+        require: true,
+        unique: true
+    },
+    company: {
+        type: String,
+        require: true
+    },
+    author: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        require: true
+    },
+    idVerified: {
+        type: Boolean,
+        default: false
+    },
+    chatId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Chat'
+    },
+    members: [{
+        id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        role: {
+            type: String,
+            enum: ROLES
+        },
+        isLeader: {
+            type: Boolean,
+            default: false
+        },
+        isReady: {
+            type: Boolean,
+            default: false
+        },
+        health: {
+            type: Number,
+            default: 100
+        },
+        level: {
+            type: Number,
+            default: 0
+        },
+        tools: {},
+        decisions: []
+    }],
     progress: {},
     status: {},
-    players: [{
-        playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        isLeader: { type: Boolean, default: false },
-        isReady: { type:Boolean, default: false },
-        equipments: {
-            personalGear: {},
-            climbingGear: {},
-            medicalGear: {},
-            clothing: {}
-        },
-        role: { type: String, unique: true, trim: true },
-        health: { type: Number, default: 100 },
-        level: { type: Number, default: 0 },
-        decisions: [{
-    		level: String,
-    		scenario: String,
-    		options: {},
-    		decision: String
-    	}]
-    }],
-    started: { type: Boolean, default: false },
-    finished: { type: Boolean, default: false }
+    started: {
+        type: Boolean,
+        default: false
+    },
+    finished: {
+        type: Boolean,
+        default: false
+    }
 },
 {
-	toObject: { getters: true },
-	timestamps: {
-		createdAt: 'createdDate',
-		updatedAt: 'updatedDate'
-	}
+    toObject: {
+        getters: true
+    },
+    timestamps: {
+        createdAt: 'createdDate',
+        updatedAt: 'updatedDate'
+    }
 });
 
-// TODO create pre(save) hooks
-
+// Compiling Team schema into a model
 let Team = mongoose.model( 'Team', teamSchema );
 module.exports = Team;
