@@ -61,7 +61,6 @@ app.use( ( err, req, res, next ) => {
 	else
 		message = '';
 
-
 	res.status( status ).json( { error: message } );
 });
 

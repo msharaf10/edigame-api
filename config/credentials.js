@@ -7,8 +7,8 @@ module.exports = {
     firstName: 'root',
     // Last name
     lastName: 'root',
-	// Username
-	username: 'root',
+    // Username
+    username: 'root',
     // Email
     superAdminEmail: 'root@example.com',
     // Password

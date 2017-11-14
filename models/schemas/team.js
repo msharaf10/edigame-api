@@ -86,13 +86,13 @@ const teamSchema = new Schema({
     }
 },
 {
-	toObject: {
+    toObject: {
         getters: true
     },
-	timestamps: {
-		createdAt: 'createdDate',
-		updatedAt: 'updatedDate'
-	}
+    timestamps: {
+        createdAt: 'createdDate',
+        updatedAt: 'updatedDate'
+    }
 });
 
 // Compiling Team schema into a model

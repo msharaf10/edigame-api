@@ -52,9 +52,9 @@ let userSchema = new Schema({
 		requierd: true
 	},
 	isVerified: {
-        type: Boolean,
-        default: false
-    },
+		type: Boolean,
+		default: false
+	},
 	role: {
 		type: String,
 		enum: ROLES,
@@ -117,7 +117,7 @@ userSchema.pre( 'save', function( callback ) {
 		bcrypt.hash( user.hash, salt, ( err, hash ) => {
 			if ( err ) return callback( err );
 
-			 // override the user's plaintext password with the hashed one
+			// override the user's plaintext password with the hashed one
 			user.hash = hash;
 			callback();
 		});
