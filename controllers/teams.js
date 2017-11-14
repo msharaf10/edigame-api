@@ -6,10 +6,9 @@ const constants = require( '../models/constants' );
 const { FIELDS } = constants;
 const { ACCEPT_REQUEST } = constants.subjects;
 const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
-const { hasSpace, validEmail, validID, catchDuplicationKey } = require( '../helpers/helpers' );
+const { validName, validEmail, validID, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getTeams = ( req, res, next ) => {
-
     let fields = '_id name company';
 
     Team.find( {}, fields ).exec()
@@ -27,14 +26,14 @@ exports.createTeam = ( req, res, next ) => {
         if ( missingParam ) return;
 
         if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
-        	missingParam = `missing ${ param }`;
+            missingParam = `missing ${ param }`;
     });
 
     if ( missingParam )
         return res.status( 400 ).json( { error: missingParam } );
 
     // validate team name
-    if ( hasSpace( req.body.teamName ) )
+    if ( !validName( req.body.teamName ) )
         return res.status( 400 ).json( { error: 'invalid team name' } );
 
     // prevent clients and super admins from creating teams
@@ -85,7 +84,7 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
 
         let sendTeamInfo = results => {
 
-            let members = results[ 0 ];
+            let membersInfo = results[ 0 ];
             let author = results[ 1 ];
 
             // team informations
@@ -97,7 +96,7 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
                 finished: team.finished,
                 members: team.members,
                 author,
-                members
+                membersInfo
             };
             return res.status( 200 ).json( teamInfo );
         }
@@ -116,8 +115,8 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
         ];
 
         Promise.all( GET_USERS )
-        .then( sendTeamInfo )
-        .catch( err => next( err ) );
+            .then( sendTeamInfo )
+            .catch( err => next( err ) );
     }
 
     let filter = {
@@ -127,7 +126,7 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
     };
 
     // push _id property to filter[ '$or' ] array if (q) param is valid id
-	if ( validID( req.params.q ) )
+    if ( validID( req.params.q ) )
         filter[ '$or' ].push( { '_id': req.params.q } );
 
     // get team informations
@@ -202,9 +201,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
             return res.status( 403 ).json( { error: 'max number of members is 5' } );
 
         // push new member to the team
-        team.members.push({
-            id: req.user.id
-        });
+        team.members.push( { id: req.user.id } );
 
         // check if request is exist
         let userRequest = user.teamRequests.findIndex(
@@ -232,8 +229,8 @@ exports.addMemberToTeam = ( req, res, next ) => {
 
         // save all changes asynchronous
         Promise.all( SAVE_CHANGES )
-        .then( () => res.sendStatus( 201 ) )
-        .catch( err => next( err ) );
+            .then( () => res.sendStatus( 201 ) )
+            .catch( err => next( err ) );
     }
 
     let GET_DATA = [
@@ -244,8 +241,8 @@ exports.addMemberToTeam = ( req, res, next ) => {
 
     // add new member to team
     Promise.all( GET_DATA )
-    .then( addNewMember )
-    .catch( err => next( err ) );
+        .then( addNewMember )
+        .catch( err => next( err ) );
 }
 
 exports.removeMemberFromTeam = ( req, res, next ) => {

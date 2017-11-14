@@ -6,10 +6,9 @@ const constants = require( '../models/constants' );
 const { FIELDS } = constants;
 const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
 const { ADMIN_PROMOTION, ADMIN_DEMOTION } = constants.subjects;
-const { hasSpace, validEmail, validID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
+const { validName, validEmail, validID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getUsers = ( req, res, next ) => {
-
 	// filter => ignore super admins
 	let filter = {
 		$or: [
@@ -39,7 +38,7 @@ exports.createUser = ( req, res, next ) => {
 	requiredParams.forEach( param => {
 		if ( missingParam ) return;
 
-        if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
+		if ( !req.body[ param ] || typeof req.body[ param ] !== 'string' || !req.body[ param ].length )
 			missingParam = `missing ${ param }`;
 	});
 
@@ -47,11 +46,8 @@ exports.createUser = ( req, res, next ) => {
 		return res.status( 400 ).json( { error: missingParam } );
 
 	// validate username
-	if ( hasSpace( req.body.username ) )
+	if ( !validName( req.body.username ) )
 		return res.status( 400 ).json( { error: 'invalid username' } );
-
-	if ( req.body.username.length <= 5 || req.body.username.length > 10 )
-		return res.status( 400 ).json( { error: 'invalid username length' } );
 
 	// validate password
 	if ( req.body.password.length <= 7 || req.body.password.length >= 31 )
@@ -63,20 +59,20 @@ exports.createUser = ( req, res, next ) => {
 
 	let newUser = new User();
 
-	newUser.firstName = req.body.firstName;
-	newUser.lastName = req.body.lastName;
-	newUser.username = req.body.username;
-	newUser.email = req.body.email;
+	newUser.firstName = req.body.firstName.toLowerCase();
+	newUser.lastName = req.body.lastName.toLowerCase();
+	newUser.username = req.body.username.toLowerCase();
+	newUser.email = req.body.email.toLowerCase();
 	newUser.hash = req.body.password;
 
 	let errorHandler = err => {
 		// check duplicate key
-        if ( err.code === 11000 ) {
-            let error = catchDuplicationKey( err );
-            return res.status( 400 ).json( error );
-        }
-        return next( err );
-    }
+		if ( err.code === 11000 ) {
+			let error = catchDuplicationKey( err );
+			return res.status( 400 ).json( error );
+		}
+		return next( err );
+	}
 
 	// save new user into the database
 	newUser.save()
@@ -138,12 +134,12 @@ exports.updateUserById = ( req, res, next ) => {
 
 	let errorHandler = err => {
 		// check duplicate key
-        if ( err.code === 11000 ) {
-            let error = catchDuplicationKey( err );
-            return res.status( 400 ).json( error );
-        }
-        return next( err );
-    }
+		if ( err.code === 11000 ) {
+			let error = catchDuplicationKey( err );
+			return res.status( 400 ).json( error );
+		}
+		return next( err );
+	}
 
 	// update user
 	User.findById( req.params.id ).exec()
@@ -258,7 +254,6 @@ exports.getTeamRequests = ( req, res, next ) => {
 
 		// get all team requests
 		user.teamRequests.forEach( request => {
-
 			let pushRequest = results => {
 
 				let sender = results[ 0 ];
@@ -287,8 +282,8 @@ exports.getTeamRequests = ( req, res, next ) => {
 
 			// preparing to find request sender & team
 			Promise.all( GET_DATA )
-			.then( pushRequest )
-			.catch( err => next( err ) );
+				.then( pushRequest )
+				.catch( err => next( err ) );
 		});
 
 		delay( 100 ).then( () =>
@@ -366,8 +361,8 @@ exports.sendTeamRequest = ( req, res, next ) => {
 
 	// send team request
 	Promise.all( GET_DATA )
-	.then( sendRequest )
-	.catch( err => next( err ) );
+		.then( sendRequest )
+		.catch( err => next( err ) );
 }
 
 exports.declineTeamRequest = ( req, res, next ) => {
@@ -438,7 +433,6 @@ exports.getAllNotifications = ( req, res, next ) => {
 exports.updateAllNotifications = ( req, res, next ) => {
 
 	let updateNotifications = user => {
-
 		user.notifications.forEach( notification => {
 			// change notifications props
 			if ( req.body.markSeen && req.body.markSeen === true )
@@ -463,7 +457,6 @@ exports.updateAllNotifications = ( req, res, next ) => {
 exports.updateOneNotification = ( req, res, next ) => {
 
 	let updateNotification = user => {
-
 		// get notification index
 		let notificationIndex = user.notifications.findIndex(
 			notification => notification._id.toString() === req.params.id
@@ -494,7 +487,6 @@ exports.updateOneNotification = ( req, res, next ) => {
 exports.deleteAllNotifications = ( req, res, next ) => {
 
 	let deleteNotifications = user => {
-
 		// override the user's notifications array
 		user.notifications = [];
 
@@ -512,7 +504,6 @@ exports.deleteAllNotifications = ( req, res, next ) => {
 exports.deleteOneNotification = ( req, res, next ) => {
 
 	let deleteNotification = user => {
-
 		// get notification index
 		let notificationIndex = user.notifications.findIndex(
 			notification => notification._id.toString() === req.params.id

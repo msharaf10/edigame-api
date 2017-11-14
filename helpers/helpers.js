@@ -4,9 +4,9 @@ exports.validEmail = email => {
     return ( regex ).test( email )
 }
 
-exports.hasSpace = string => {
-    let regex = /^[a-zA-Z0-9-_]+$/;
-    return !( regex ).test( string );
+exports.validName = string => {
+    let regex = /^[a-zA-Z0-9_]{6,15}$/
+    return ( regex ).test( string )
 }
 
 exports.isValidPhone = phone => {
@@ -14,7 +14,6 @@ exports.isValidPhone = phone => {
         i;
 
     for ( i = 0; i < phone.length; i++ ) {
-
         if ( !isNaN( phone[ i ] ) )
             userPhone += phone[ i ];
     }
