@@ -6,7 +6,7 @@ const constants = require( '../models/constants' );
 const { FIELDS } = constants;
 const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
 const { ADMIN_PROMOTION, ADMIN_DEMOTION } = constants.subjects;
-const { validName, validEmail, validID, delay, catchDuplicationKey } = require( '../helpers/helpers' );
+const { validName, validEmail, validID, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getUsers = ( req, res, next ) => {
 	// filter => ignore super admins
@@ -245,53 +245,47 @@ exports.adminDemotion = ( req, res, next ) => {
 
 exports.getTeamRequests = ( req, res, next ) => {
 
-	let getRequests = user => {
-		if ( !user )
-			return res.status( 404 ).json( { error: 'user not found' } );
+	// Requests holder
+	const Requests = [];
 
-		// Requests holder
-		let Requests = [];
-
+	const getRequests = user => {
+		const IDs = { senders: [], teams: [] };
+		const dates = [];
 		// get all team requests
 		user.teamRequests.forEach( request => {
-			let pushRequest = results => {
-
-				let sender = results[ 0 ];
-				let team = results[ 1 ];
-
-				if ( !sender || !team )
-					return res.status( 404 ).json( { error: 'sender/team not found' } );
-
-				// collect all request information
-				let requestKeys = {
-					from: `${ sender.firstName } ${ sender.lastName }`,
-					senderId: sender._id,
-					senderImg: sender.imgURL,
-					team: team.name,
-					date: request.date
-				};
-
-				// push request information to Requests array
-				Requests.push( requestKeys );
-			};
-
-			let GET_DATA = [
-				User.findById( request.from ).exec(),	// get request sender
-				Team.findById( request.teamId ).exec()	// get team
-			];
-
-			// preparing to find request sender & team
-			Promise.all( GET_DATA )
-				.then( pushRequest )
-				.catch( err => next( err ) );
+			IDs.senders.push( request.from )
+			IDs.teams.push( request.teamId )
+			dates.push( request.date )
 		});
 
-		delay( 100 ).then( () =>
-			res.status( 200 ).json( Requests )
-		);
+		const pushRequest =  results => {
+			const senders = results[ 0 ];
+			const teams = results[ 1 ];
+
+			senders.forEach( ( sender, index ) => {
+				const props = {
+					sender: `${ sender.firstName } ${ sender.lastName }`,
+					senderId: sender._id,
+					senderImg: sender.imgURL,
+					team: teams[ index ].name,
+					teamId: teams[ index ]._id,
+					date: dates[ index ]
+				};
+				Requests.push( props );
+			});
+			res.status( 200 ).json( Requests );
+		}
+
+		const GET_DATA = [
+			User.find({ _id: { $in: IDs.senders } }).exec(),	// get senders
+			Team.find({ _id: { $in: IDs.teams } }).exec(),		// get teams
+		];
+
+		Promise.all( GET_DATA )
+			.then( pushRequest )
+			.catch( err => next( err ) );
 	}
 
-	// get user requests
 	User.findById( req.user.id ).exec()
 		.then( getRequests )
 		.catch( err => next( err ) );

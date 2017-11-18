@@ -29,10 +29,6 @@ exports.validID = id => {
     return ( regex ).test( id );
 }
 
-exports.delay = ms => {
-    return new Promise( resolve => setTimeout( resolve, ms ) );
-}
-
 exports.catchDuplicationKey = err => {
     let field = err.message.split( 'index: ' )[ 1 ];
     field = field.split( ' dup key' )[ 0 ];
