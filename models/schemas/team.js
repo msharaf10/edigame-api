@@ -38,13 +38,13 @@ const teamSchema = new Schema({
         ref: 'User',
         require: true
     },
-    idVerified: {
+    isVerified: {
         type: Boolean,
         default: false
     },
-    chatId: {
+    conversationId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Chat'
+        ref: 'Conversation'
     },
     members: [{
         id: {
