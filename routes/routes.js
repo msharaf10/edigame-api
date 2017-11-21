@@ -28,6 +28,9 @@ router.param( 'id', ( req, res, next ) => {
 // ======================
 // users
 // ======================
+router.route( '/user/getData' )
+	.get( auth.tokenRequired, users.getUserData );
+
 router.route( '/users' )
 	.get( users.getUsers )
 	.post( users.createUser, auth.loginUser );

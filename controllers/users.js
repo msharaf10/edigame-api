@@ -80,6 +80,78 @@ exports.createUser = ( req, res, next ) => {
 		.catch( errorHandler );
 }
 
+exports.getUserData = ( req, res, next ) => {
+	let collectData = user => {
+		if ( !user )
+			return res.status( 404 ).json( { error: 'user not found' } );
+
+		const IDs = { senders: [], teams: [] };
+		const dates = [];
+
+		// TODO get notifications info
+
+		let data = {
+			user: {
+				_id: user._id,
+				role: user.role,
+				imgURL: user.imgURL,
+				firstName: user.firstName,
+				lastName: user.lastName,
+				username: user.username,
+				isVerified: user.isVerified
+			},
+			notifications: [],
+			teamRequests: []
+		};
+
+		if ( req.user.role === SUPERADMIN )
+			return res.status( 200 ).json( data );
+
+		if ( req.user.role === ADMIN ) {
+			data.notifications = user.notifications;
+			return res.status( 200 ).json( data );
+		}
+
+		// get all team requests
+		user.teamRequests.forEach( request => {
+			IDs.senders.push( request.from )
+			IDs.teams.push( request.teamId )
+			dates.push( request.date )
+		});
+
+		const getData = results => {
+			const senders = results[ 0 ];
+			const teams = results[ 1 ];
+
+			// get team requests
+			senders.forEach( ( sender, index ) => {
+				const props = {
+					sender: `${ sender.firstName } ${ sender.lastName }`,
+					senderId: sender._id,
+					senderImg: sender.imgURL,
+					team: teams[ index ].name,
+					teamId: teams[ index ]._id,
+					date: dates[ index ]
+				};
+				data.teamRequests.push( props );
+			});
+			res.status( 200 ).json( data );
+		}
+
+		let GET_DATA = [
+			User.find({ _id: { $in: IDs.senders } }).exec(),	// get senders
+			Team.find({ _id: { $in: IDs.teams } }).exec(),		// get teams
+		];
+
+		Promise.all( GET_DATA )
+			.then( getData )
+			.catch( err => next( err ) );
+	}
+	User.findById( req.user.id ).exec()
+		.then( collectData )
+		.catch( err => next( err ) );
+}
+
 exports.getUserByIdOrUsername = ( req, res, next ) => {
 
 	// filter => ignore super admins
@@ -308,8 +380,8 @@ exports.sendTeamRequest = ( req, res, next ) => {
 		if ( !user || !team )
 			return res.status( 404 ).json( { error: 'user/team not found' } );
 
-		// reject admins and super admins from joining teams
-		if ( user.role === ADMIN || user.role === SUPERADMIN )
+		// reject if user is not client
+		if ( user.role !== CLIENT )
 			return res.status( 403 ).json( { error: 'not client' } );
 
 		// check if user is already member of the team
