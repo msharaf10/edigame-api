@@ -79,8 +79,8 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
             membersIDs.push( member.id );
         });
 
-        if ( notMember && team.author.toString() !== req.user.id.toString() )
-            return res.status( 403 ).json( { error: 'not member' } );
+        if ( notMember && team.author.toString() !== req.user.id.toString() && req.user.role !== ADMIN )
+            return res.status( 403 ).json( { error: 'not allowed' } );
 
         let sendTeamInfo = results => {
 
@@ -89,14 +89,14 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
 
             // team informations
             let teamInfo = {
+                author,
+                membersInfo,
                 id: team._id,
                 name: team.name,
                 company: team.company,
                 started: team.started,
                 finished: team.finished,
-                members: team.members,
-                author,
-                membersInfo
+                isVerified: team.isVerified
             };
             return res.status( 200 ).json( teamInfo );
         }
@@ -107,11 +107,11 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
             }
         };
 
-        let authorFields = '_id firstName lastName username';
+        let Fields = 'firstName lastName username';
 
         let GET_USERS = [
-            User.find( filterIDs, FIELDS ).exec(),              // get members
-            User.findById( team.author, authorFields ).exec()   // get author
+            User.find( filterIDs, Fields ).exec(),              // get members
+            User.findById( team.author, Fields ).exec()   // get author
         ];
 
         Promise.all( GET_USERS )
@@ -150,7 +150,7 @@ exports.getTeamsOfUserOrAdmin = ( req, res, next ) => {
         return res.sendStatus( 400 );
 
     if ( req.user.role === SUPERADMIN )
-        return res.sendStatus( 403 );
+        return res.status( 200 ).json( [] );
 
     let filter;
 
@@ -166,7 +166,7 @@ exports.getTeamsOfUserOrAdmin = ( req, res, next ) => {
             'members.id': req.params.id
         };
 
-    Team.find( filter ).exec()
+    Team.find( filter, '_id name company' ).exec()
         .then( teams => res.status( 200 ).json( teams ) )
         .catch( err => next( err ) );
 }
