@@ -51,6 +51,9 @@ router.route( '/requests/teams/send' )
 router.route( '/requests/teams/destroy' )
 	.delete( auth.tokenRequired, users.declineTeamRequest );
 
+router.route( '/requests/teams/sent' )
+	.get( auth.adminRequired, users.getSentTeamRequests );
+
 router.route( '/notifications' )
 	.get( auth.tokenRequired, users.getAllNotifications )
 	.put( auth.tokenRequired, users.updateAllNotifications )
@@ -90,6 +93,9 @@ router.route( '/teams/members/add' )
 
 router.route( '/teams/members/destroy' )
 	.delete( auth.adminRequired, teams.removeMemberFromTeam );
+
+router.route( '/teams/members/leader' )
+	.post( auth.adminRequired, teams.makeLeader );
 
 // ======================
 // Search
