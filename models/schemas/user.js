@@ -14,9 +14,7 @@
 
 const mongoose = require( 'mongoose' );
 const bcrypt = require( 'bcrypt' );
-
-const { SUPERADMIN, ADMIN, CLIENT } = require( '../constants' ).userRoles;
-const ROLES = [ SUPERADMIN, ADMIN, CLIENT ];
+const { SUPERADMIN, ADMIN, CLIENT } = require( '../../config/constants' ).userRoles;
 
 const Schema = mongoose.Schema;
 
@@ -57,14 +55,14 @@ let userSchema = new Schema({
 	},
 	role: {
 		type: String,
-		enum: ROLES,
+		enum: [ CLIENT, ADMIN, SUPERADMIN ],
 		default: CLIENT
 	},
 	notifications: [{
 		subject: String,
 		date: Date,
 		sender: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: 'User'
 		},
 		seen: {
@@ -78,11 +76,11 @@ let userSchema = new Schema({
 	}],
 	teamRequests: [{
 		from: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: 'User'
 		},
 		teamId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: 'Team'
 		},
 		date: Date

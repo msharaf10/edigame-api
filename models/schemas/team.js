@@ -11,49 +11,47 @@
 *           Mohamed Sharaf
 *
 */
-
 const mongoose = require( 'mongoose' );
-
-const { DOCTOR, ENGINEER } = require( '../constants' ).memberRoles;
-const ROLES = [ DOCTOR, ENGINEER ];
+const { DOCTOR, ENGINEER } = require( '../../config/constants' ).memberRoles;
 
 const Schema = mongoose.Schema;
 
 // ==========================
 // TEAM SCHEMA
 // ==========================
+// TODO: teamname: unique, name: { min: 6, max: 20 }
 const teamSchema = new Schema({
     name: {
         type: String,
         trim: true,
-        require: true,
+        required: true,
         unique: true
     },
     company: {
         type: String,
-        require: true
+        required: true
     },
     author: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'User',
-        require: true
+        required: true
     },
     isVerified: {
         type: Boolean,
         default: false
     },
     conversationId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'Conversation'
     },
     members: [{
         id: {
-            type: mongoose.Schema.Types.ObjectId,
+            type: Schema.Types.ObjectId,
             ref: 'User'
         },
         role: {
             type: String,
-            enum: ROLES
+            enum: [ DOCTOR, ENGINEER ]
         },
         isLeader: {
             type: Boolean,
@@ -76,6 +74,10 @@ const teamSchema = new Schema({
     }],
     progress: {},
     status: {},
+    isReady: {
+        type: Boolean,
+        default: false
+    },
     started: {
         type: Boolean,
         default: false
