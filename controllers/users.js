@@ -1,7 +1,7 @@
 const User = require( '../models/schemas/user' );
 const Team = require( '../models/schemas/team' );
 
-const constants = require( '../models/constants' );
+const constants = require( '../config/constants' );
 
 const { FIELDS } = constants;
 const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
@@ -239,81 +239,101 @@ exports.deleteUserById = ( req, res, next ) => {
 }
 
 exports.adminPromotion = ( req, res, next ) => {
-
-	// TODO check if user is a member of a team
-
 	// validate user id
 	if ( !req.body.userId || !req.body.userId.length )
 		return res.status( 400 ).json( { error: 'missing user id' } );
 
-	let promoteUser = user => {
-		if ( !user )
-			return res.status( 404 ).json( { error: 'user not found' } );
+	let checkIfUserIsAMember = teams => {
+		if ( teams.length )
+			return res.status( 403 ).json({ error: 'this user is a team member' });
 
-		if ( user.role === ADMIN )
-			return res.status( 208 ).json( { error: 'already an admin' } );
+		let promoteUser = user => {
+			if ( !user )
+				return res.status( 404 ).json( { error: 'user not found' } );
 
-		// change the role to 'Admin'
-		user.role = ADMIN;
+			if ( user.role === ADMIN )
+				return res.status( 208 ).json( { error: 'already an admin' } );
 
-		// send promotion notification
-		user.notifications.push({
-			sender: req.user.id,
-			subject: ADMIN_PROMOTION,
-			date: new Date().toString()
-		});
+			// change the role to 'Admin'
+			user.role = ADMIN;
 
-		// save changes into database
-		user.save()
-			.then( () => res.sendStatus( 201 ) )
+			// send promotion notification
+			user.notifications.push({
+				sender: req.user.id,
+				subject: ADMIN_PROMOTION,
+				date: new Date().toString()
+			});
+
+			// save changes into database
+			user.save()
+				.then( () => res.sendStatus( 201 ) )
+				.catch( err => next( err ) );
+		}
+
+		// promote user
+		User.findById( req.body.userId ).exec()
+			.then( promoteUser )
 			.catch( err => next( err ) );
 	}
 
-	// promote user
-	User.findById( req.body.userId ).exec()
-		.then( promoteUser )
-		.catch( err => next( err ) );
+	Team.find( { 'members.id': req.body.userId } ).exec()
+		.then( checkIfUserIsAMember )
+		.catch( err => next( err ));
 }
 
 exports.adminDemotion = ( req, res, next ) => {
-
 	// validate user id
 	if ( !req.body.userId || !req.body.userId.length )
 		return res.status( 400 ).json( { error: 'missing user id' } );
 
-	let demoteUser = user => {
-		if ( !user )
+	let checkIfAdminIsAuthorOfATeam = teams => {
+		debugger
+		if ( teams.length )
+			return res.status( 403 ).json({ error: 'admin is an author of team(s)' });
+
+		let demoteUser = user => {
+			if ( !user )
 			return res.status( 404 ).json( { error: 'user not found' } );
 
-		if ( user.role !== ADMIN )
+			if ( user.role !== ADMIN )
 			return res.status( 208 ).json( { error: 'not an admin' } );
 
-		// change the role to 'Admin'
-		user.role = CLIENT;
+			// change the role to 'Admin'
+			user.role = CLIENT;
 
-		// send demotion otification
-		user.notifications.push({
-			sender: req.user.id,
-			subject: ADMIN_DEMOTION,
-			date: new Date().toString()
-		});
+			// send demotion otification
+			user.notifications.push({
+				sender: req.user.id,
+				subject: ADMIN_DEMOTION,
+				date: new Date().toString()
+			});
 
-		// save changes into database
-		user.save()
+			// save changes into database
+			user.save()
 			.then( () => res.sendStatus( 200 ) )
 			.catch( err => next( err ) );
+		}
+
+		// demote user
+		User.findById( req.body.userId ).exec()
+		.then( demoteUser )
+		.catch( err => next( err ) );
 	}
 
-	// demote user
-	User.findById( req.body.userId ).exec()
-		.then( demoteUser )
+	Team.find( { 'author': req.body.userId } ).exec()
+		.then( checkIfAdminIsAuthorOfATeam )
 		.catch( err => next( err ) );
 }
 
 // --------------------------------------------------
 // Requests
 // --------------------------------------------------
-// TODO get sent requests(teams)
+exports.getSentTeamRequests = ( req, res, next ) => {
+	let Fields = '_id teamRequests.from teamRequests.teamId';
+	User.find({ 'teamRequests.from': req.user.id }, Fields ).exec()
+		.then( requests => res.send( requests ))
+		.catch( err => next( err ) );
+}
 
 exports.getTeamRequests = ( req, res, next ) => {
 
