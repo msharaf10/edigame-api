@@ -15,17 +15,16 @@
 */
 
 const jwt = require( 'jsonwebtoken' );
-
 const User = require( '../models/schemas/user' );
 
-const constants = require( '../models/constants' );
+const constants = require( '../config/constants' );
 const { secretKey } = require( '../config/credentials' );
 const { validEmail, validID } = require( '../helpers/helpers' );
 const { ADMIN, SUPERADMIN } = constants.userRoles;
 
 exports.loginUser = ( req, res, next ) => {
     // check required params
-    let requiredParams = [
+    const requiredParams = [
         'email',
         'password'
     ],
@@ -39,37 +38,36 @@ exports.loginUser = ( req, res, next ) => {
     });
 
     if ( missingParam )
-        return res.status( 400 ).json( { error: missingParam } );
+        return res.status( 400 ).json({ error: missingParam });
 
     // validate email
     if ( !validEmail( req.body.email ) )
-        return res.status( 400 ).json( { error: 'invalid email' } );
+        return res.status( 400 ).json({ error: 'invalid email' });
 
-    let sendToken = user => {
+    const sendToken = user => {
         if ( !user )
-            return res.status( 404 ).json( { error: 'no user with that email' } );
+            return res.status( 404 ).json({ error: 'no user with that email' });
 
         // compare passwords
         user.comparePassword( req.body.password, ( err, isMatch ) => {
             if ( err ) return next( err );
 
             if ( !isMatch )
-                return res.status( 401 ).json( { error: 'incorrect password' } );
+                return res.status( 401 ).json({ error: 'incorrect password' });
 
-            let payload = { id: user._id };
+            const payload = { id: user._id };
 
-            let token = jwt.sign( payload, secretKey );
+            const token = jwt.sign( payload, secretKey );
 
             user.token = token;
 
             user.save()
-                .then( () => res.json( { token: token } ) )
+                .then( res.json({ token: token }) )
                 .catch( err => next( err ) );
         });
     }
 
-    // send a token to user
-    User.findOne( { email: req.body.email } ).exec()
+    User.findOne({ email: req.body.email }).exec()
         .then( sendToken )
         .catch( err => next( err ) );
 }
@@ -94,15 +92,11 @@ exports.superAdminRequired = ( req, res, next ) => {
     validateToken( req, res, next, false, true );
 }
 
-exports.leaderRequired = ( req, res, next ) => {
-    // TODO leader required
-}
-
 const validateToken = ( req, res, next, admin, superAdmin ) => {
-    let token = req.headers[ 'x-access-token' ] || req.body.token;
+    const token = req.headers[ 'x-access-token' ] || req.body.token;
 
     if ( !token )
-        return res.status( 403 ).json( { error: 'token required' } );
+        return res.status( 403 ).json({ error: 'token required' });
 
     let decoded;
 
@@ -110,24 +104,24 @@ const validateToken = ( req, res, next, admin, superAdmin ) => {
     try {
         decoded = jwt.verify( token, secretKey );
     } catch ( e ) {
-        return res.status( 403 ).json( { error: 'failed to authenticate token' } );
+        return res.status( 403 ).json({ error: 'failed to authenticate token' });
     }
 
     if ( !decoded.id || !validID( decoded.id ) )
-        return res.status( 403 ).json( { error: 'invalid token' } );
+        return res.status( 403 ).json({ error: 'invalid token' });
 
-    let checkUserIdentity = user => {
+    const checkUserIdentity = user => {
         if ( !user )
-            return res.status( 403 ).json( { error: 'invalid user ID' } );
+            return res.status( 403 ).json({ error: 'invalid user ID' });
 
         if ( token !== user.token )
-            return res.status( 403 ).json( { error: 'expired token' } );
+            return res.status( 403 ).json({ error: 'expired token' });
 
         if ( admin && user.role !== ADMIN )
-            return res.status( 403 ).json( { error: 'admin required' } );
+            return res.status( 403 ).json({ error: 'admin required' });
 
         if ( superAdmin && user.role !== SUPERADMIN )
-            return res.status( 403 ).json( { error: 'super admin required' } );
+            return res.status( 403 ).json({ error: 'super admin required' });
 
         req.user = {
             id: decoded.id,
