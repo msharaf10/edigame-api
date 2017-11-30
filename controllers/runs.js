@@ -16,13 +16,13 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
             isMember = false;
 
         team.members.forEach( member => {
-            if ( member.id.toString() === req.user.id.toString() ) {
+            if ( member.id.toString() === req.user.id ) {
                 isMember = true;
                 return
             }
         });
 
-        if ( team.members.findIndex( m => m.id.toString() === req.user.id.toString() ) === -1 )
+        if ( team.members.findIndex( m => m.id.toString() === req.user.id ) === -1 )
             return res.status( 403 ).json({ error: 'not allowed' });
 
         team.members.forEach( member => {
@@ -104,10 +104,10 @@ exports.toggleReadyState = ( req, res, next ) => {
         if ( !team )
             return res.status( 404 ).json({ erroe: 'team not found' });
 
-        if ( team.members.findIndex( m => m.id.toString() === req.user.id.toString() ) > -1 )
+        if ( team.members.findIndex( m => m.id.toString() === req.user.id ) > -1 )
             return res.status( 403 ).json({ error: 'not allowed' });
 
-        const memberIndex = team.members.findIndex( m => m.id.toString() === req.user.id.toString() );
+        const memberIndex = team.members.findIndex( m => m.id.toString() === req.user.id );
 
         if ( memberIndex === -1 )
             return res.status( 404 ).json({ error: 'member not found' });
@@ -115,7 +115,7 @@ exports.toggleReadyState = ( req, res, next ) => {
         team.members[ memberIndex ].isReady = !team.members[ memberIndex ].isReady;
 
         team.save()
-            .then( () => res.sendStatus( 200 ) )
+            .then( res.sendStatus( 200 ) )
             .catch( err => next( err ) );
     }
 
@@ -129,7 +129,7 @@ exports.getReadyMembers = ( req, res, next ) => {
         if ( !team )
             return res.status( 404 ).json({ error: 'team not found' });
 
-        if ( team.members.findIndex( m => m.id.toString() === req.user.id.toString() ) > -1 )
+        if ( team.members.findIndex( m => m.id.toString() === req.user.id ) > -1 )
             return res.status( 403 ).json({ error: 'not allowed' });
 
         const readyMembers = [];
@@ -157,7 +157,11 @@ exports.changeMemberRole = ( req, res, next ) => {
 
     const changeRole = team => {
         if ( !team )
-            return res.status( 404 ).json({ error: 'team not found '});
+            return res.status( 404 ).json({ error: 'team not found ' });
+
+        const index = team.members.findIndex( m => m.id.toString() === req.user.id )
+        if ( index === -1 )
+            return res.status( 400 ).json({ error: 'you are not a member' });
 
         if ( team.started )
             return res.status( 403 ).json({ error: `you can't change your role after team is started` });
@@ -165,20 +169,52 @@ exports.changeMemberRole = ( req, res, next ) => {
         if ( !team.isReady )
             return res.status( 403 ).json({ error: 'team must be ready to change your role' });
 
-        const index = team.members.findIndex( m => m.id.toString() === req.user.id.toString() )
-        if ( index === -1 )
-            return res.status( 400 ).json({ error: 'you are not a member' });
-
         team.members[ index ].role = req.body.role
 
         res.sendStatus( 200 );
     }
 
-    Team.findOne( { '_id': req.body.teamId } ).exec()
+    Team.findById( req.body.teamId ).exec()
         .then( changeRole )
         .catch( err => next( err ) );
 }
 
 exports.startRun = ( req, res, next ) => {
-    // TODO: team start run
+    if ( !req.body.teamId || !req.body.teamId.length || !validID( req.body.teamId ) )
+        return res.status( 400 ).json({ error: 'missing team id' });
+
+    const getStarted = team => {
+        if ( !team )
+            return res.status( 404 ).json({ error: 'team not found' });
+
+        const index = team.members.findIndex( m => m.id.toString() === req.user.id )
+        if ( index === -1 )
+            return res.status( 400 ).json({ error: 'you are not a member' });
+
+        if ( team.members[ index ].isLeader !== true )
+            return res.status( 403 ).json({ error: 'leader required' });
+
+        if ( !team.isReady )
+            return res.status( 403 ).json({ error: 'team must be ready to start the run' });
+
+        if ( team.started )
+            return res.status( 403 ).json({ error: 'already started' });
+
+        const membersHasNoRole = team.members.filter( member => member.role === undefined );
+        if ( membersHasNoRole.length )
+            return res.status( 403 ).json({ error: 'there are members that have no roles yet' });
+
+        const membersNotReady = team.members.filter( members => members.isReady === false );
+        if ( membersNotReady.length )
+            return res.status( 403 ).json({ error: 'there are not ready members' });
+
+        team.started = true;
+        team.save()
+            .then( res.sendStatus( 200 ) )
+            .catch( err => next( err ) );
+    }
+
+    Team.findById( req.body.teamId ).exec()
+        .then( getStarted )
+        .catch( err => next( err ) );
 }
