@@ -603,7 +603,7 @@ exports.deleteOneNotification = ( req, res, next ) => {
 
 		// save changes into the database
 		user.save()
-			.then( () => res.sendStatus( 200 ) )
+			.then( res.sendStatus( 200 ) )
 			.catch( err => next( err ) );
 	}
 

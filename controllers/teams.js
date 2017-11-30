@@ -57,7 +57,7 @@ exports.createTeam = ( req, res, next ) => {
 
     // save new team into the database
     newTeam.save()
-        .then( () => res.sendStatus( 201 ) )
+        .then( res.sendStatus( 201 ) )
         .catch( errorHandler );
 }
 
@@ -66,17 +66,11 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
         if ( !team )
             return res.status( 404 ).json({ error: 'team not found' });
 
-        let membersIDs = [],
-            isMember = false;
+        let membersIDs = [];
 
-        team.members.forEach( member => {
-            if ( member.id.toString() === req.user.id.toString() ) {
-                isMember = true;
-                return
-            }
-        });
+        const isMember = team.members.findIndex( member => member.id.toString() === req.user.id ) > -1;
 
-        if ( !isMember && team.author.toString() !== req.user.id.toString() && req.user.role !== ADMIN )
+        if ( !isMember && team.author.toString() !== req.user.id && req.user.role !== ADMIN )
             return res.status( 403 ).json({ error: 'not allowed' });
 
         team.members.forEach( member => {
@@ -248,7 +242,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
 
         // save all changes asynchronous
         Promise.all( SAVE_CHANGES )
-            .then( () => res.sendStatus( 201 ) )
+            .then( res.sendStatus( 201 ) )
             .catch( err => next( err ) );
     }
 
@@ -292,7 +286,7 @@ exports.removeMemberFromTeam = ( req, res, next ) => {
         team.members.splice( memberIndex, 1 );
 
         team.save()
-            .then( () => res.sendStatus( 200 ) )
+            .then( res.sendStatus( 200 ) )
             .catch( err => next( err ) );
     }
 
@@ -328,7 +322,7 @@ exports.makeLeader = ( req, res, next ) => {
         });
 
         team.save()
-            .then( () => res.sendStatus( 200 ) )
+            .then( res.sendStatus( 200 ) )
             .catch( err => next( err) );
     }
 
@@ -350,7 +344,7 @@ exports.changeReadyStateOfTeam = ( req, res, next ) => {
 
         team.isReady = true
         team.save()
-            .then( () => res.sendStatus( 200 ) )
+            .then( res.sendStatus( 200 ) )
             .catch( err => mext( err ) );
     }
 

@@ -3,7 +3,7 @@ const mongoose = require( 'mongoose' );
 const User = require( '../models/schemas/user' );
 const Team = require( '../models/schemas/team' );
 
-const constants = require( '../models/constants' );
+const constants = require( '../config/constants' );
 
 exports.searchUsers = ( req, res, next ) => {
     // TODO search clients
