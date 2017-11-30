@@ -2,6 +2,7 @@ const express = require( 'express' );
 
 const users = require( '../controllers/users' );
 const teams = require( '../controllers/teams' );
+const runs = require( '../controllers/runs' );
 const search = require( '../controllers/search' );
 const auth = require( '../controllers/auth' );
 
@@ -51,6 +52,9 @@ router.route( '/requests/teams/send' )
 router.route( '/requests/teams/destroy' )
 	.delete( auth.tokenRequired, users.declineTeamRequest );
 
+router.route( '/requests/teams/sent' )
+	.get( auth.adminRequired, users.getSentTeamRequests );
+
 router.route( '/notifications' )
 	.get( auth.tokenRequired, users.getAllNotifications )
 	.put( auth.tokenRequired, users.updateAllNotifications )
@@ -81,15 +85,17 @@ router.route( '/teams/:id' )
 router.route( '/teams/users/:id' )
 	.get( auth.tokenRequired, teams.getTeamsOfUserOrAdmin );
 
-router.route( '/teams/:id/ready' )
-	.get( auth.tokenRequired, teams.getReadyMembers )
-	.post( auth.tokenRequired, teams.toggleReadyState );
-
 router.route( '/teams/members/add' )
 	.post( auth.tokenRequired, teams.addMemberToTeam );
 
 router.route( '/teams/members/destroy' )
 	.delete( auth.adminRequired, teams.removeMemberFromTeam );
+
+router.route( '/teams/members/leader' )
+	.post( auth.adminRequired, teams.makeLeader );
+
+router.route( '/teams/ready' )
+	.post( auth.adminRequired, teams.changeReadyStateOfTeam );
 
 // ======================
 // Search
@@ -101,7 +107,15 @@ router.post( '/search/teams', auth.adminRequired, search.searchTeams );
 // ======================
 // Match/Run
 // ======================
-// match routes here
+router.route( '/runs/teams/members/ready' )
+	.get( auth.tokenRequired, runs.getReadyMembers )
+	.post( auth.tokenRequired, runs.toggleReadyState );
+
+router.route( '/runs/teams/members/role' )
+	.post( auth.tokenRequired, runs.changeMemberRole );
+
+router.route( '/runs/teams/start' )
+	.post( auth.tokenRequired, runs.startRun );
 
 // ======================
 // Authentication

@@ -20,7 +20,7 @@ const User = require( '../models/schemas/user' );
 
 const { db } = require( '../config/main' );
 const credentials = require( '../config/credentials' );
-const { SUPERADMIN } = require( '../models/constants' ).userRoles;
+const { SUPERADMIN } = require( '../config/constants' ).userRoles;
 
 // set disconnect flag
 let disconnect = false;

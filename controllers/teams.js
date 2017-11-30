@@ -1,7 +1,7 @@
 const Team = require( '../models/schemas/team' );
 const User = require( '../models/schemas/user' );
 
-const constants = require( '../models/constants' );
+const constants = require( '../config/constants' );
 
 const { FIELDS } = constants;
 const { ACCEPT_REQUEST } = constants.subjects;
@@ -9,7 +9,7 @@ const { SUPERADMIN, ADMIN, CLIENT } = constants.userRoles;
 const { validName, validEmail, validID, catchDuplicationKey } = require( '../helpers/helpers' );
 
 exports.getTeams = ( req, res, next ) => {
-    let fields = '_id name company';
+    let fields = '_id name company members.id';
 
     Team.find( {}, fields ).exec()
         .then( teams => res.status( 200 ).json( teams ) )
@@ -19,7 +19,7 @@ exports.getTeams = ( req, res, next ) => {
 // TODO create new chat to the new team
 exports.createTeam = ( req, res, next ) => {
 
-    let requiredParams = [ 'name', 'company' ],
+    let requiredParams = [ 'teamName', 'company' ],
         missingParam = false;
 
     requiredParams.forEach( param => {
@@ -57,47 +57,60 @@ exports.createTeam = ( req, res, next ) => {
 
     // save new team into the database
     newTeam.save()
-        .then( () => res.sendStatus( 201 ) )
+        .then( res.sendStatus( 201 ) )
         .catch( errorHandler );
 }
 
 exports.getTeamByIdOrName = ( req, res, next ) => {
-
     let getTeamInfo = team => {
         if ( !team )
-            return res.status( 404 ).json( { error: 'team not found' } );
+            return res.status( 404 ).json({ error: 'team not found' });
 
-        let membersIDs = [],
-            notMember = false;
+        let membersIDs = [];
+
+        const isMember = team.members.findIndex( member => member.id.toString() === req.user.id ) > -1;
+
+        if ( !isMember && team.author.toString() !== req.user.id && req.user.role !== ADMIN )
+            return res.status( 403 ).json({ error: 'not allowed' });
 
         team.members.forEach( member => {
-            if ( notMember ) return;
-
-            if ( member.id.toString() !== req.user.id.toString() )
-                notMember = true;
-
             membersIDs.push( member.id );
         });
-
-        if ( notMember && team.author.toString() !== req.user.id.toString() && req.user.role !== ADMIN )
-            return res.status( 403 ).json( { error: 'not allowed' } );
 
         let sendTeamInfo = results => {
 
             let membersInfo = results[ 0 ];
             let author = results[ 1 ];
 
+            let members = [];
+
+            team.members.forEach( member => {
+                const memberInfo = membersInfo.find( m => m._id.toString() === member.id.toString() );
+                members.push({
+                    _id: member.id,
+                    role: member.role,
+                    firstName: memberInfo.firstName,
+                    lastName: memberInfo.lastName,
+                    username: memberInfo.username,
+                    isLeader: member.isLeader
+                });
+            });
+
             // team informations
             let teamInfo = {
                 author,
-                membersInfo,
-                id: team._id,
+                members,
+                _id: team._id,
                 name: team.name,
                 company: team.company,
                 started: team.started,
                 finished: team.finished,
-                isVerified: team.isVerified
+                isVerified: team.isVerified,
+                isReady: team.isReady,
+                teamIsReady: false
             };
+            if ( members.length === 5 )
+                teamInfo.teamIsReady = true
             return res.status( 200 ).json( teamInfo );
         }
 
@@ -110,8 +123,8 @@ exports.getTeamByIdOrName = ( req, res, next ) => {
         let Fields = 'firstName lastName username';
 
         let GET_USERS = [
-            User.find( filterIDs, Fields ).exec(),              // get members
-            User.findById( team.author, Fields ).exec()   // get author
+            User.find( filterIDs, Fields ).exec(),          // get members
+            User.findById( team.author, Fields ).exec()     // get author
         ];
 
         Promise.all( GET_USERS )
@@ -166,7 +179,7 @@ exports.getTeamsOfUserOrAdmin = ( req, res, next ) => {
             'members.id': req.params.id
         };
 
-    Team.find( filter, '_id name company' ).exec()
+    Team.find( filter, '_id name company members.id' ).exec()
         .then( teams => res.status( 200 ).json( teams ) )
         .catch( err => next( err ) );
 }
@@ -201,7 +214,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
             return res.status( 403 ).json( { error: 'max number of members is 5' } );
 
         // push new member to the team
-        team.members.push( { id: req.user.id } );
+        team.members.push({ id: req.user.id });
 
         // check if request is exist
         let userRequest = user.teamRequests.findIndex(
@@ -229,7 +242,7 @@ exports.addMemberToTeam = ( req, res, next ) => {
 
         // save all changes asynchronous
         Promise.all( SAVE_CHANGES )
-            .then( () => res.sendStatus( 201 ) )
+            .then( res.sendStatus( 201 ) )
             .catch( err => next( err ) );
     }
 
@@ -246,8 +259,6 @@ exports.addMemberToTeam = ( req, res, next ) => {
 }
 
 exports.removeMemberFromTeam = ( req, res, next ) => {
-    // TODO remove any team info associated with the member
-
     if ( !req.body.userId || !req.body.userId.length )
         return res.status( 400 ).json( { error: 'missing user id' } );
 
@@ -257,6 +268,12 @@ exports.removeMemberFromTeam = ( req, res, next ) => {
     let removeExistingMember = team => {
         if ( !team )
             return res.status( 404 ).json( { error: 'team not found' } );
+
+        if ( req.user.id !== team.author.toString() )
+            return res.status( 403 ).json( { error: 'not allowed' } );
+
+        if ( team.isReady || team.started )
+            return res.status( 403 ).json({ error: `you can't remove members now` });
 
         // check if member is not found
         let memberIndex = team.members.findIndex(
@@ -269,7 +286,7 @@ exports.removeMemberFromTeam = ( req, res, next ) => {
         team.members.splice( memberIndex, 1 );
 
         team.save()
-            .then( () => res.sendStatus( 200 ) )
+            .then( res.sendStatus( 200 ) )
             .catch( err => next( err ) );
     }
 
@@ -278,59 +295,60 @@ exports.removeMemberFromTeam = ( req, res, next ) => {
         .catch( ( err ) => next( err ) );
 }
 
-exports.getReadyMembers = ( req, res, next ) => {
+exports.makeLeader = ( req, res, next ) => {
+    if ( !req.body.teamId || !req.body.teamId.length )
+        return res.status( 401 ).json({ error: 'missing team id' });
 
-    let sendReadyMembers = team => {
+    if ( !req.body.userId || !req.body.userId.length )
+        return res.status( 401 ).json({ error: 'missing user id' });
+
+    const MakeLeader = team => {
         if ( !team )
-            return res.status( 404 ).json( { error: 'team not found' } );
+            return res.status( 404 ).json({ error: 'team not found' });
 
-        // check if requester is a team member or admin
-        let found = false;
+        if ( req.user.id !== team.author.toString() )
+            return res.status( 403 ).json({ error: 'not allowed' });
+
+        if ( team.isReady || team.started )
+            return res.status( 403 ).json({ error: `you can't change the team leader now` });
+
+        if ( team.members.findIndex( m => m.id.toString() === req.body.userId ) === -1 )
+            return res.status( 403 ).json({ error: 'member not found' });
 
         team.members.forEach( member => {
-            if ( found ) return;
-
-            if ( member.id.toString() === req.user.id )
-                found = true;
+            if ( member.id.toString() === req.body.userId )
+                return member.isLeader = true
+            member.isLeader = false
         });
 
-        if ( !found && team.author.toString() !== req.user.id )
-            return res.sendStatus( 401 );
-
-        let readyMembers = team.members.filter( member => {
-            if ( member.isReady )
-                return member;
-        });
-
-        return res.status( 200 ).json( readyMembers );
+        team.save()
+            .then( res.sendStatus( 200 ) )
+            .catch( err => next( err) );
     }
 
-    Team.findById( req.body.teamId || req.params.id ).exec()
-        .then( sendReadyMembers )
+    Team.findByIdAndUpdate( req.body.teamId ).exec()
+        .then( MakeLeader )
         .catch( err => next( err ) );
 }
 
-exports.toggleReadyState = ( req, res, next ) => {
+exports.changeReadyStateOfTeam = ( req, res, next ) => {
+    if ( !req.body.teamId || !req.body.teamId.length )
+        return res.status( 400 ).json({ error: 'missing team id' });
 
-    let toggleReady = team => {
+    const changeReadyState = team => {
         if ( !team )
-            return res.status( 404 ).json( { erroe: 'team not found' } );
+            return res.status( 404 ).json({ error: 'team not found' });
 
-        let memberIndex = team.members.findIndex(
-            member => member.id.toString() === req.user.id
-        );
+        if ( team.authot.toString() !== req.user.id.toString() )
+            return res.status( 403 ).json({ error: 'not allowed' });
 
-        if ( memberIndex === -1 )
-            return res.status( 404 ).json( { error: 'member not found' } );
-
-        team.members[ memberIndex ].isReady = !team.members[ memberIndex ].isReady;
-
+        team.isReady = true
         team.save()
-            .then( () => res.sendStatus( 200 ) )
-            .catch( err => next( err ) );
+            .then( res.sendStatus( 200 ) )
+            .catch( err => mext( err ) );
     }
 
-    Team.findById( req.params.id ).exec()
-        .then( toggleReady )
+    Team.findById( req.body.teamId ).exec()
+        .then( changeReadyState )
         .catch( err => next( err ) );
 }
